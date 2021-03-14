@@ -1,0 +1,9 @@
+body {
+    padding-top: 2rem;
+}
+
+@media (min-height: 700px) {
+    body {
+        padding-top: 5rem;
+    }
+}

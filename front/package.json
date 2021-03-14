@@ -1,0 +1,19 @@
+{
+  "name": "td.mpsi1.fr",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.html",
+  "scripts": {
+    "start": "NODE_ENV=development parcel serve ./src/index.html",
+    "build": "NODE_ENV=production parcel build ./src/index.html --no-source-maps"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "parcel": "^2.0.0-beta.1"
+  },
+  "dependencies": {
+    "bootstrap": "^5.0.0-beta2",
+    "preact": "^10.5.12"
+  }
+}

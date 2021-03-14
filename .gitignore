@@ -1,0 +1,5 @@
+/api/target
+
+/front/.parcel-cache
+/front/dist
+/front/node_modules
