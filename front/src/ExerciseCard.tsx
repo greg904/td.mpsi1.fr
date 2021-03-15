@@ -27,10 +27,7 @@ export function ExerciseCard(props: Props) {
     if (props.exercise.blocked) {
         blockedText = <Fragment>
             <h6 class="mb-2 text-muted">Ne pas faire</h6>
-            <p>
-                Cet exercice à été marqué comme "à ne pas faire" par quelqu'un.
-                Demandez dans le Discord pour plus d'information.
-            </p>
+            <p>Cet exercice à été marqué comme "à ne pas faire" par quelqu'un.</p>
         </Fragment>
     }
 
