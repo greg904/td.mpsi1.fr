@@ -217,6 +217,7 @@ export function ExerciseCard(props: Props) {
         }
     } else {
         const onClickReset = (e: MouseEvent) => {
+            e.preventDefault()
             setExerciseState("none", () => {
                 const newExercise = Object.assign({}, props.exercise)
                 newExercise.presentedBy = newExercise.presentedBy.filter(s => s.id !== props.student.id)

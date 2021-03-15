@@ -100,6 +100,11 @@ export function Dashboard(props: Props) {
         setSelectedUnit(index)
     }
 
+    const onClickBack = (e: MouseEvent) => {
+        e.preventDefault()
+        setSelectedUnit(-1)
+    }
+
     let main
     let breadcrumb
     if (selectedUnit !== -1) {
@@ -110,7 +115,7 @@ export function Dashboard(props: Props) {
             groupA={student.groupA}/>
         breadcrumb = <Fragment>
             <li class="breadcrumb-item">
-                <a href="#" onClick={e => setSelectedUnit(-1)}>Chapitres</a>
+                <a href="#" onClick={onClickBack}>Chapitres</a>
             </li>
             <li class="breadcrumb-item active" aria-current="page">
                 {units[selectedUnit].name}
