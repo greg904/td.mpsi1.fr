@@ -23,6 +23,7 @@ name = "api-td-mpsi1-fr"
 version = "0.1.0"
 dependencies = [
  "base64",
+ "bytes",
  "futures",
  "hmac",
  "http",

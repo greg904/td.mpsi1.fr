@@ -383,7 +383,7 @@ pub(crate) async fn mark_exercise_corrected(
 }
 
 pub(crate) async fn submit_exercise_correction(
-    req: Request<Body>,
+    mut req: Request<Body>,
     unit_id: u32,
     exercise: u32,
     db: &Mutex<Connection>,
@@ -408,13 +408,29 @@ pub(crate) async fn submit_exercise_correction(
         return empty(StatusCode::NOT_FOUND);
     }
 
-    let b = try_400!(hyper::body::to_bytes(req).await);
+    const MAX_PICTURE_SIZE: usize = 1024 * 1024 * 5;
+
+    let b = match collect_body(req.body_mut(), MAX_PICTURE_SIZE).await {
+        Ok(val) => val,
+        Err(CollectBodyError::ReadError(err)) => {
+            warn_for_req(
+                &req,
+                config,
+                &format!("failed to read body from correction submission: {:?}", err),
+            );
+            return empty(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        Err(CollectBodyError::TooLarge) => {
+            warn_for_req(&req, config, "correction submission body is too large");
+            return empty(StatusCode::PAYLOAD_TOO_LARGE);
+        }
+    };
     let reader = try_400!(ImageReader::new(Cursor::new(b)).with_guessed_format());
     let input = try_400!(reader.decode());
 
     let mut png = Vec::new();
     try_500!(input.write_to(&mut png, ImageOutputFormat::Png));
-    if png.len() > 1024 * 1024 * 5 {
+    if png.len() > MAX_PICTURE_SIZE {
         return empty(StatusCode::PAYLOAD_TOO_LARGE);
     }
 

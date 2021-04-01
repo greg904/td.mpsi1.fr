@@ -1,6 +1,11 @@
+use std::convert::TryInto;
+
+use bytes::buf::BufMut;
 use http::{Request, StatusCode};
-use hyper::{Body, Response};
+use hyper::{body::HttpBody, Body, Response};
 use serde::Serialize;
+
+use crate::config::Config;
 
 macro_rules! r#try_500 {
     ($expr:expr $(,)?) => {
@@ -54,6 +59,7 @@ pub(crate) fn json<T: ?Sized + Serialize>(value: &T, status: StatusCode) -> Resp
         .unwrap()
 }
 
+/// Extracts the bearer token from an HTTP request.
 pub(crate) fn get_bearer(req: &Request<Body>) -> Option<&str> {
     let auth_header = req.headers().get(http::header::AUTHORIZATION)?;
     let mut parts = auth_header.to_str().ok()?.split_ascii_whitespace();
@@ -63,4 +69,46 @@ pub(crate) fn get_bearer(req: &Request<Body>) -> Option<&str> {
         }
     }
     None
+}
+
+pub(crate) enum CollectBodyError {
+    ReadError(hyper::Error),
+    TooLarge,
+}
+
+/// Concatenates chunks from the body into a vector and returns it.
+pub(crate) async fn collect_body(
+    body: &mut Body,
+    max_len: usize,
+) -> Result<Vec<u8>, CollectBodyError> {
+    let size_hint: usize = match body.size_hint().lower().try_into() {
+        Ok(val) => val,
+        Err(_) => return Err(CollectBodyError::TooLarge),
+    };
+    if size_hint > max_len {
+        return Err(CollectBodyError::TooLarge);
+    }
+    let mut r = Vec::with_capacity(size_hint);
+    while let Some(chunk) = body.data().await {
+        let chunk = match chunk {
+            Ok(val) => val,
+            Err(err) => return Err(CollectBodyError::ReadError(err)),
+        };
+        if r.len() + chunk.len() > max_len {
+            return Err(CollectBodyError::TooLarge);
+        }
+        r.put(chunk);
+    }
+    Ok(r)
+}
+
+/// Warn about an issue that happened during the handling of a request.
+pub(crate) fn warn_for_req(req: &Request<Body>, config: &Config, msg: &str) {
+    let ip = config
+        .real_ip_header
+        .as_ref()
+        .and_then(|h| req.headers().get(h))
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("(unknown IP)");
+    eprintln!("[{}] {}", ip, msg);
 }

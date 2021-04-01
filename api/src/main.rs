@@ -10,7 +10,10 @@ use std::{future, panic::AssertUnwindSafe};
 
 use futures::FutureExt;
 use http::StatusCode;
-use hyper::service::{make_service_fn, service_fn};
+use hyper::{
+    server::conn::AddrStream,
+    service::{make_service_fn, service_fn},
+};
 use hyper::{Body, Request, Response, Server};
 use rusqlite::Connection;
 use tokio::sync::Mutex;
@@ -120,7 +123,8 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // For every connection, we must make a `Service` to handle all
     // incoming HTTP requests on said connection.
-    let make_svc = make_service_fn(move |_conn| {
+    let make_svc = make_service_fn(move |conn: &AddrStream| {
+        conn.remote_addr();
         // This is the `Service` that will handle the connection.
         // `service_fn` is a helper to convert a function that
         // returns a Response into a `Service`.
