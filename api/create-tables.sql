@@ -41,6 +41,13 @@ CREATE TABLE exercise_student_state (
     UNIQUE(student_id, unit_id, exercise)
 );
 
+CREATE TABLE exercise_corrections (
+    unit_id INTEGER NOT NULL,
+    exercise INTEGER NOT NULL,
+    picture_digest TEXT NOT NULL,
+    UNIQUE(unit_id, exercise, picture_digest)
+);
+
 INSERT INTO students (username, full_name, group_a) VALUES ("antoine", "Cybélia Antoine", false);
 INSERT INTO students (username, full_name, group_a) VALUES ("audoin", "Anatol Audoin", false);
 INSERT INTO students (username, full_name, group_a) VALUES ("yadrin", "Alexei Yadrin", false);

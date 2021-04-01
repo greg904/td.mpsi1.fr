@@ -45,6 +45,7 @@ impl Globals {
                                 Some("state") => return handlers::change_exercise_state(req, unit_id, exercise, &self.db, &self.config).await,
                                 Some("blocked") => return handlers::mark_exercise_blocked(req, unit_id, exercise, &self.db, &self.config).await,
                                 Some("corrected") => return handlers::mark_exercise_corrected(req, unit_id, exercise, &self.db, &self.config).await,
+                                Some("corrections") => return handlers::submit_exercise_correction(req, unit_id, exercise, &self.db, &self.config).await,
                                 _ => {},
                             },
                             None if req.method() == http::Method::GET => return handlers::unit_exercises(req, unit_id, &self.db, &self.config).await,

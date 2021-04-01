@@ -1,13 +1,16 @@
-use std::convert::TryFrom;
+use std::{convert::TryFrom, io::{Cursor, ErrorKind}};
 
 use hmac::{Hmac, Mac, NewMac};
 use http::StatusCode;
 use hyper::{Body, Request, Response};
+use image::{ImageOutputFormat, io::Reader as ImageReader};
 use rusqlite::{Connection, NO_PARAMS, params};
+use rusqlite::Error as SqliteError;
+use rusqlite::ErrorCode as SqliteErrorCode;
 use serde::{Deserialize, Serialize};
-use sha2::Sha256;
+use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
-use tokio::sync::Mutex;
+use tokio::{fs::{OpenOptions}, io::AsyncWriteExt, sync::Mutex};
 
 use crate::config::Config;
 use crate::http_helpers::*;
@@ -125,6 +128,9 @@ struct Exercise {
     /// The teacher corrected the exercise for group B
     #[serde(rename = "correctedB")]
     corrected_b: bool,
+    /// A list of digests for the pictures with the correction.
+    #[serde(rename = "correctionDigests")]
+    correction_digests: Vec<String>,
 }
 
 pub(crate) async fn unit_exercises(req: Request<Body>, unit_id: u32, db: &Mutex<Connection>, config: &Config) -> Response<Body> {
@@ -185,6 +191,20 @@ pub(crate) async fn unit_exercises(req: Request<Body>, unit_id: u32, db: &Mutex<
         exercise.blocked = try_500!(r.get(1));
         exercise.corrected_a = try_500!(r.get(2));
         exercise.corrected_b = try_500!(r.get(3));
+        row = try_500!(rows.next());
+    }
+
+    let mut stmt = try_500!(db.prepare("SELECT exercise, picture_digest FROM exercise_corrections WHERE unit_id = ?"));
+    let mut rows = try_500!(stmt.query(params![unit_id]));
+    let mut row = try_500!(rows.next());
+    while let Some(r) = row {
+        let exercise_idx: u32 = try_500!(r.get(0));
+        let digest: String = try_500!(r.get(1));
+        let exercise = match result.get_mut(try_500!(usize::try_from(exercise_idx))) {
+            Some(val) => val,
+            None => panic!("Exercise index out of bounds: {}", exercise_idx),
+        };
+        exercise.correction_digests.push(digest);
         row = try_500!(rows.next());
     }
 
@@ -307,6 +327,78 @@ pub(crate) async fn mark_exercise_corrected(req: Request<Body>, unit_id: u32, ex
     let mut stmt = try_500!(db.prepare(&query));
     try_500!(stmt.execute(params![unit_id, exercise, corrected, corrected]));
     
+    empty(StatusCode::OK)
+}
+
+pub(crate) async fn submit_exercise_correction(req: Request<Body>, unit_id: u32, exercise: u32, db: &Mutex<Connection>, config: &Config) -> Response<Body> {
+    // Accessing this resource requires authentication.
+    let _ = try_401!(get_auth(&req, config));
+
+    let db = db.lock().await;
+
+    let exercise_count: u32 = {
+        let mut stmt = try_500!(db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1"));
+        let mut rows = try_500!(stmt.query(params![unit_id]));
+        let row = match try_500!(rows.next()) {
+            Some(val) => val,
+            None => return empty(StatusCode::NOT_FOUND),
+        };
+        try_500!(row.get(0))
+    };
+    if exercise >= exercise_count {
+        return empty(StatusCode::NOT_FOUND);
+    }
+
+    let b = try_400!(hyper::body::to_bytes(req).await);
+    let reader = try_400!(ImageReader::new(Cursor::new(b))
+        .with_guessed_format());
+    let input = try_400!(reader.decode());
+
+    let mut png = Vec::new();
+    try_500!(input.write_to(&mut png, ImageOutputFormat::Png));
+    if png.len() > 1024 * 1024 * 5 {
+        return empty(StatusCode::PAYLOAD_TOO_LARGE);
+    }
+
+    let mut hash = Sha256::new();
+    hash.update(&png);
+    let digest = hash.finalize();
+    let digest_base64 = base64::encode_config(digest.as_slice(), base64::URL_SAFE_NO_PAD);
+
+    {
+        let mut stmt = try_500!(db.prepare("INSERT INTO exercise_corrections (unit_id, exercise, picture_digest) VALUES (?, ?, ?)"));
+        if let Err(err) = stmt.execute(params![unit_id, exercise, digest_base64]) {
+            match err {
+                SqliteError::SqliteFailure(rusqlite::ffi::Error { code: SqliteErrorCode::ConstraintViolation, .. }, _)  => {
+                    // The unique constraint is violated: the correction already exists.
+                    return empty(StatusCode::CONFLICT);
+                }
+                _ => {
+                    eprintln!("Error while inserting correction: {:?}", err);
+                    return empty(StatusCode::INTERNAL_SERVER_ERROR);
+                },
+            }
+        }
+    }
+
+    let mut png_file = match OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(format!("corrections/{}.png", digest_base64))
+        .await {
+        Ok(val) => val,
+        Err(err) => {
+            if err.kind() == ErrorKind::AlreadyExists {
+                // Assume that the files are the same since they have the same
+                // hash so we can stop here and use the old file.
+                return empty(StatusCode::OK);
+            }
+            eprintln!("Error while opening correction file for writing: {:?}", err);
+            return empty(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+    try_500!(png_file.write_all(&png).await);
+
     empty(StatusCode::OK)
 }
 
