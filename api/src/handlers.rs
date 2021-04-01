@@ -6,7 +6,7 @@ use std::{
 use hmac::{Hmac, Mac, NewMac};
 use http::StatusCode;
 use hyper::{Body, Request, Response};
-use image::{io::Reader as ImageReader, ImageOutputFormat};
+use image::{io::Reader as ImageReader, GenericImageView, ImageFormat, ImageOutputFormat};
 use rusqlite::Error as SqliteError;
 use rusqlite::ErrorCode as SqliteErrorCode;
 use rusqlite::{params, Connection, NO_PARAMS};
@@ -73,7 +73,7 @@ pub(crate) async fn me(
     config: &Config,
 ) -> Response<Body> {
     // Accessing this resource requires authentication.
-    let student_id = try_401!(get_auth(&req, config));
+    let student_id = try_401!(get_logged_in_user_id(&req, config));
 
     let db = db.lock().await;
     let mut stmt =
@@ -110,7 +110,7 @@ pub(crate) async fn units(
     config: &Config,
 ) -> Response<Body> {
     // Accessing this resource requires authentication.
-    try_401!(get_auth(&req, config));
+    try_401!(get_logged_in_user_id(&req, config));
 
     let db = db.lock().await;
     let mut stmt =
@@ -159,7 +159,7 @@ pub(crate) async fn unit_exercises(
     config: &Config,
 ) -> Response<Body> {
     // Accessing this resource requires authentication.
-    try_401!(get_auth(&req, config));
+    try_401!(get_logged_in_user_id(&req, config));
 
     let db = db.lock().await;
     let exercise_count: u32 = {
@@ -219,9 +219,9 @@ pub(crate) async fn unit_exercises(
         row = try_500!(rows.next());
     }
 
-    let mut stmt = try_500!(
-        db.prepare("SELECT exercise, picture_digest FROM exercise_corrections WHERE unit_id = ?")
-    );
+    let mut stmt = try_500!(db.prepare(
+        "SELECT unit_exercise, picture_digest FROM exercise_corrections WHERE unit_id = ?"
+    ));
     let mut rows = try_500!(stmt.query(params![unit_id]));
     let mut row = try_500!(rows.next());
     while let Some(r) = row {
@@ -256,7 +256,7 @@ pub(crate) async fn change_exercise_state(
     config: &Config,
 ) -> Response<Body> {
     // Accessing this resource requires authentication.
-    let student_id = try_401!(get_auth(&req, config));
+    let student_id = try_401!(get_logged_in_user_id(&req, config));
 
     let b = try_400!(hyper::body::to_bytes(req).await);
     let new_state: ExerciseStudentState = try_400!(serde_json::from_slice(&b));
@@ -304,7 +304,7 @@ pub(crate) async fn mark_exercise_blocked(
     config: &Config,
 ) -> Response<Body> {
     // Accessing this resource requires authentication.
-    try_401!(get_auth(&req, config));
+    try_401!(get_logged_in_user_id(&req, config));
 
     let b = try_400!(hyper::body::to_bytes(req).await);
     let blocked: bool = try_400!(serde_json::from_slice(&b));
@@ -339,7 +339,7 @@ pub(crate) async fn mark_exercise_corrected(
     config: &Config,
 ) -> Response<Body> {
     // Accessing this resource requires authentication.
-    let student_id = try_401!(get_auth(&req, config));
+    let student_id = try_401!(get_logged_in_user_id(&req, config));
 
     let b = try_400!(hyper::body::to_bytes(req).await);
     let corrected: bool = try_400!(serde_json::from_slice(&b));
@@ -389,22 +389,49 @@ pub(crate) async fn submit_exercise_correction(
     db: &Mutex<Connection>,
     config: &Config,
 ) -> Response<Body> {
-    // Accessing this resource requires authentication.
-    let _ = try_401!(get_auth(&req, config));
-
-    let db = db.lock().await;
+    let user_id = match get_logged_in_user_id(&req, config) {
+        Ok(val) => val,
+        Err(err) => {
+            warn_for_req(
+                &req,
+                config,
+                &format!(
+                    "exercise correction submission with invalid authentication: {:?}",
+                    err
+                ),
+            );
+            return empty(StatusCode::FORBIDDEN);
+        }
+    };
 
     let exercise_count: u32 = {
-        let mut stmt =
-            try_500!(db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1"));
-        let mut rows = try_500!(stmt.query(params![unit_id]));
-        let row = match try_500!(rows.next()) {
+        let db = db.lock().await;
+        let mut stmt = db
+            .prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1")
+            .unwrap();
+        let mut rows = stmt.query(params![unit_id]).unwrap();
+        let row = match rows.next().unwrap() {
             Some(val) => val,
-            None => return empty(StatusCode::NOT_FOUND),
+            None => {
+                warn_for_req(
+                    &req,
+                    config,
+                    &format!("correction submission with non existing unit {}", unit_id),
+                );
+                return empty(StatusCode::NOT_FOUND);
+            }
         };
-        try_500!(row.get(0))
+        row.get(0).unwrap()
     };
     if exercise >= exercise_count {
+        warn_for_req(
+            &req,
+            config,
+            &format!(
+                "correction submission for non existing exercise {} in unit {}",
+                exercise, unit_id
+            ),
+        );
         return empty(StatusCode::NOT_FOUND);
     }
 
@@ -425,12 +452,70 @@ pub(crate) async fn submit_exercise_correction(
             return empty(StatusCode::PAYLOAD_TOO_LARGE);
         }
     };
-    let reader = try_400!(ImageReader::new(Cursor::new(b)).with_guessed_format());
-    let input = try_400!(reader.decode());
+    let mut reader = ImageReader::new(Cursor::new(b));
+    if let Some(v) = req.headers().get(http::header::CONTENT_TYPE) {
+        if v == "image/png" {
+            reader.set_format(ImageFormat::Png);
+        } else if v == "image/jpeg" {
+            reader.set_format(ImageFormat::Jpeg);
+        } else if v == "image/gif" {
+            reader.set_format(ImageFormat::Gif);
+        } else if v == "image/webp" {
+            reader.set_format(ImageFormat::WebP);
+        } else if v == "image/tiff" {
+            reader.set_format(ImageFormat::Tiff);
+        } else if v == "image/bmp" {
+            reader.set_format(ImageFormat::Bmp);
+        } else if v == "image/x-icon" {
+            reader.set_format(ImageFormat::Ico);
+        } else if v == "image/avif" {
+            reader.set_format(ImageFormat::Avif);
+        }
+    }
+    if reader.format().is_none() {
+        reader = match reader.with_guessed_format() {
+            Ok(val) => val,
+            Err(err) => {
+                warn_for_req(
+                    &req,
+                    config,
+                    &format!(
+                        "failed to guess image format for correction picture: {:?}",
+                        err
+                    ),
+                );
+                return empty(StatusCode::BAD_REQUEST);
+            }
+        };
+    }
+
+    let image = match reader.decode() {
+        Ok(val) => val,
+        Err(err) => {
+            warn_for_req(
+                &req,
+                config,
+                &format!("failed to decode correction picture: {:?}", err),
+            );
+            return empty(StatusCode::BAD_REQUEST);
+        }
+    };
+    if image.width() > 10_000 || image.height() > 10_000 {
+        warn_for_req(&req, config, "correction picture dimensions exceed limits");
+        return empty(StatusCode::BAD_REQUEST);
+    }
 
     let mut png = Vec::new();
-    try_500!(input.write_to(&mut png, ImageOutputFormat::Png));
+    if let Err(err) = image.write_to(&mut png, ImageOutputFormat::Png) {
+        warn_for_req(
+            &req,
+            config,
+            &format!("failed to encode correction picture as PNG: {:?}", err),
+        );
+        return empty(StatusCode::INTERNAL_SERVER_ERROR);
+    }
     if png.len() > MAX_PICTURE_SIZE {
+        warn_for_req(&req, config, "encoded PNG image is too large");
         return empty(StatusCode::PAYLOAD_TOO_LARGE);
     }
 
@@ -440,10 +525,11 @@ pub(crate) async fn submit_exercise_correction(
     let digest_base64 = base64::encode_config(digest.as_slice(), base64::URL_SAFE_NO_PAD);
 
     {
-        let mut stmt = try_500!(db.prepare(
-            "INSERT INTO exercise_corrections (unit_id, exercise, picture_digest) VALUES (?, ?, ?)"
-        ));
-        if let Err(err) = stmt.execute(params![unit_id, exercise, digest_base64]) {
+        let db = db.lock().await;
+        let mut stmt = db.prepare(
+            "INSERT INTO exercise_corrections (unit_id, unit_exercise, created_by, picture_digest) VALUES (?, ?, ?, ?)"
+        ).unwrap();
+        if let Err(err) = stmt.execute(params![unit_id, exercise, user_id, digest_base64]) {
             match err {
                 SqliteError::SqliteFailure(
                     rusqlite::ffi::Error {
@@ -452,11 +538,16 @@ pub(crate) async fn submit_exercise_correction(
                     },
                     _,
                 ) => {
-                    // The unique constraint is violated: the correction already exists.
+                    // The unique constraint is violated because the
+                    // correction already exists.
                     return empty(StatusCode::CONFLICT);
                 }
                 _ => {
-                    eprintln!("Error while inserting correction: {:?}", err);
+                    warn_for_req(
+                        &req,
+                        config,
+                        &format!("failed to insert correction entry: {:?}", err),
+                    );
                     return empty(StatusCode::INTERNAL_SERVER_ERROR);
                 }
             }
@@ -479,35 +570,23 @@ pub(crate) async fn submit_exercise_correction(
                 // hash so we can stop here and use the old file.
                 return empty(StatusCode::OK);
             }
-            eprintln!("Error while opening correction file for writing: {:?}", err);
+            warn_for_req(
+                &req,
+                config,
+                &format!("failed to open correction picture for writing: {:?}", err),
+            );
             return empty(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
-    try_500!(png_file.write_all(&png).await);
+
+    if let Err(err) = png_file.write_all(&png).await {
+        warn_for_req(
+            &req,
+            config,
+            &format!("failed to write correction picture: {:?}", err),
+        );
+        return empty(StatusCode::INTERNAL_SERVER_ERROR);
+    }
 
     empty(StatusCode::OK)
-}
-
-#[derive(Debug)]
-enum AuthError {
-    MissingBearer,
-    MissingDot,
-    WeirdStudentId,
-    WeirdSig,
-    UnverifiedSig,
-}
-
-fn get_auth(req: &Request<Body>, config: &Config) -> Result<u32, AuthError> {
-    let bearer = get_bearer(&req).ok_or(AuthError::MissingBearer)?;
-    let dot = bearer.find('.').ok_or(AuthError::MissingDot)?;
-    let id_str = &bearer[..dot];
-    let id: u32 = id_str.parse().ok().ok_or(AuthError::WeirdStudentId)?;
-    let sig = base64::decode_config(&bearer[(dot + 1)..], base64::URL_SAFE_NO_PAD)
-        .map_err(|_err| AuthError::WeirdSig)?;
-    let mut hmac = HmacSha256::new_varkey(&config.secret).unwrap();
-    hmac.update(id_str.as_bytes());
-    if hmac.verify(&sig).is_err() {
-        return Err(AuthError::UnverifiedSig);
-    }
-    Ok(id)
 }

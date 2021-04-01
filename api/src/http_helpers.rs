@@ -1,11 +1,15 @@
 use std::convert::TryInto;
 
 use bytes::buf::BufMut;
+use hmac::{Hmac, Mac, NewMac};
 use http::{Request, StatusCode};
 use hyper::{body::HttpBody, Body, Response};
 use serde::Serialize;
+use sha2::Sha256;
 
 use crate::config::Config;
+
+type HmacSha256 = Hmac<Sha256>;
 
 macro_rules! r#try_500 {
     ($expr:expr $(,)?) => {
@@ -69,6 +73,32 @@ pub(crate) fn get_bearer(req: &Request<Body>) -> Option<&str> {
         }
     }
     None
+}
+
+#[derive(Debug)]
+pub(crate) enum HttpAuthError {
+    MissingBearer,
+    MissingDot,
+    InvalidStudentId,
+    InvalidSig,
+}
+
+pub(crate) fn get_logged_in_user_id(
+    req: &Request<Body>,
+    config: &Config,
+) -> Result<u32, HttpAuthError> {
+    let bearer = get_bearer(&req).ok_or(HttpAuthError::MissingBearer)?;
+    let dot = bearer.find('.').ok_or(HttpAuthError::MissingDot)?;
+    let id_str = &bearer[..dot];
+    let id: u32 = id_str.parse().ok().ok_or(HttpAuthError::InvalidStudentId)?;
+    let sig = base64::decode_config(&bearer[(dot + 1)..], base64::URL_SAFE_NO_PAD)
+        .map_err(|_err| HttpAuthError::InvalidSig)?;
+    let mut hmac = HmacSha256::new_varkey(&config.secret).unwrap();
+    hmac.update(id_str.as_bytes());
+    if hmac.verify(&sig).is_err() {
+        return Err(HttpAuthError::InvalidSig);
+    }
+    Ok(id)
 }
 
 pub(crate) enum CollectBodyError {

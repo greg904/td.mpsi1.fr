@@ -42,10 +42,15 @@ CREATE TABLE exercise_student_state (
 );
 
 CREATE TABLE exercise_corrections (
+    id INTEGER PRIMARY KEY,
     unit_id INTEGER NOT NULL,
-    exercise INTEGER NOT NULL,
+    unit_exercise INTEGER NOT NULL,
+    created_by INTEGER NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     picture_digest TEXT NOT NULL,
-    UNIQUE(unit_id, exercise, picture_digest)
+    FOREIGN KEY (unit_id) REFERENCES units(id),
+    FOREIGN KEY (created_by) REFERENCES students(id),
+    UNIQUE(unit_id, unit_exercise, picture_digest)
 );
 
 INSERT INTO students (username, full_name, group_a) VALUES ("antoine", "Cybélia Antoine", false);
