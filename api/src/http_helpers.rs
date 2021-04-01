@@ -9,7 +9,7 @@ macro_rules! r#try_500 {
             Err(err) => {
                 eprintln!("Error while handling request: {:?}", err);
                 return $crate::http_helpers::empty(::http::StatusCode::INTERNAL_SERVER_ERROR);
-            },
+            }
         }
     };
 }
@@ -20,8 +20,8 @@ macro_rules! r#try_400 {
             Ok(val) => val,
             Err(err) => {
                 eprintln!("Bad request: {:?}", err);
-                return $crate::http_helpers::empty(::http::StatusCode::BAD_REQUEST)
-            },
+                return $crate::http_helpers::empty(::http::StatusCode::BAD_REQUEST);
+            }
         }
     };
 }
@@ -32,8 +32,8 @@ macro_rules! r#try_401 {
             Ok(val) => val,
             Err(err) => {
                 eprintln!("Auth failed in request: {:?}", err);
-                return $crate::http_helpers::empty(::http::StatusCode::UNAUTHORIZED)
-            },
+                return $crate::http_helpers::empty(::http::StatusCode::UNAUTHORIZED);
+            }
         }
     };
 }
@@ -56,9 +56,7 @@ pub(crate) fn json<T: ?Sized + Serialize>(value: &T, status: StatusCode) -> Resp
 
 pub(crate) fn get_bearer(req: &Request<Body>) -> Option<&str> {
     let auth_header = req.headers().get(http::header::AUTHORIZATION)?;
-    let mut parts = auth_header.to_str()
-        .ok()?
-        .split_ascii_whitespace();
+    let mut parts = auth_header.to_str().ok()?.split_ascii_whitespace();
     if let (Some(ty), Some(creds)) = (parts.next(), parts.next()) {
         if ty.to_ascii_lowercase() == "bearer" {
             return Some(creds);

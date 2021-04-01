@@ -1,16 +1,19 @@
-use std::{convert::TryFrom, io::{Cursor, ErrorKind}};
+use std::{
+    convert::TryFrom,
+    io::{Cursor, ErrorKind},
+};
 
 use hmac::{Hmac, Mac, NewMac};
 use http::StatusCode;
 use hyper::{Body, Request, Response};
-use image::{ImageOutputFormat, io::Reader as ImageReader};
-use rusqlite::{Connection, NO_PARAMS, params};
+use image::{io::Reader as ImageReader, ImageOutputFormat};
 use rusqlite::Error as SqliteError;
 use rusqlite::ErrorCode as SqliteErrorCode;
+use rusqlite::{params, Connection, NO_PARAMS};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
-use tokio::{fs::{OpenOptions}, io::AsyncWriteExt, sync::Mutex};
+use tokio::{fs::OpenOptions, io::AsyncWriteExt, sync::Mutex};
 
 use crate::config::Config;
 use crate::http_helpers::*;
@@ -23,7 +26,11 @@ struct LogInRequest {
     password: String,
 }
 
-pub(crate) async fn log_in(req: Request<Body>, db: &Mutex<Connection>, config: &Config) -> Response<Body> {
+pub(crate) async fn log_in(
+    req: Request<Body>,
+    db: &Mutex<Connection>,
+    config: &Config,
+) -> Response<Body> {
     let b = try_400!(hyper::body::to_bytes(req).await);
     let r: LogInRequest = try_400!(serde_json::from_slice(&b));
     let db = db.lock().await;
@@ -34,7 +41,9 @@ pub(crate) async fn log_in(req: Request<Body>, db: &Mutex<Connection>, config: &
         Some(row) => try_500!(row.get(0)),
         None => return empty(StatusCode::UNAUTHORIZED),
     };
-    let passwd_ok: bool = r.password.as_bytes()
+    let passwd_ok: bool = r
+        .password
+        .as_bytes()
         .ct_eq(config.password.as_bytes())
         .into();
     if !passwd_ok {
@@ -58,12 +67,17 @@ struct Student {
     group_a: bool,
 }
 
-pub(crate) async fn me(req: Request<Body>, db: &Mutex<Connection>, config: &Config) -> Response<Body> {
+pub(crate) async fn me(
+    req: Request<Body>,
+    db: &Mutex<Connection>,
+    config: &Config,
+) -> Response<Body> {
     // Accessing this resource requires authentication.
     let student_id = try_401!(get_auth(&req, config));
 
     let db = db.lock().await;
-    let mut stmt = try_500!(db.prepare("SELECT id, username, full_name, group_a FROM students WHERE id = ?"));
+    let mut stmt =
+        try_500!(db.prepare("SELECT id, username, full_name, group_a FROM students WHERE id = ?"));
     let mut rows = try_500!(stmt.query(params![student_id]));
     let row = match try_500!(rows.next()) {
         Some(val) => val,
@@ -90,12 +104,17 @@ struct Unit {
     deadline_b: String,
 }
 
-pub(crate) async fn units(req: Request<Body>, db: &Mutex<Connection>, config: &Config) -> Response<Body> {
+pub(crate) async fn units(
+    req: Request<Body>,
+    db: &Mutex<Connection>,
+    config: &Config,
+) -> Response<Body> {
     // Accessing this resource requires authentication.
     try_401!(get_auth(&req, config));
 
     let db = db.lock().await;
-    let mut stmt = try_500!(db.prepare("SELECT id, name, exercise_count, deadline_a, deadline_b FROM units"));
+    let mut stmt =
+        try_500!(db.prepare("SELECT id, name, exercise_count, deadline_a, deadline_b FROM units"));
     let mut rows = try_500!(stmt.query(NO_PARAMS));
     let mut result: Vec<Unit> = Vec::new();
     let mut row = try_500!(rows.next());
@@ -133,13 +152,19 @@ struct Exercise {
     correction_digests: Vec<String>,
 }
 
-pub(crate) async fn unit_exercises(req: Request<Body>, unit_id: u32, db: &Mutex<Connection>, config: &Config) -> Response<Body> {
+pub(crate) async fn unit_exercises(
+    req: Request<Body>,
+    unit_id: u32,
+    db: &Mutex<Connection>,
+    config: &Config,
+) -> Response<Body> {
     // Accessing this resource requires authentication.
     try_401!(get_auth(&req, config));
 
     let db = db.lock().await;
     let exercise_count: u32 = {
-        let mut stmt = try_500!(db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1"));
+        let mut stmt =
+            try_500!(db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1"));
         let mut rows = try_500!(stmt.query(params![unit_id]));
         let row = match try_500!(rows.next()) {
             Some(val) => val,
@@ -194,7 +219,9 @@ pub(crate) async fn unit_exercises(req: Request<Body>, unit_id: u32, db: &Mutex<
         row = try_500!(rows.next());
     }
 
-    let mut stmt = try_500!(db.prepare("SELECT exercise, picture_digest FROM exercise_corrections WHERE unit_id = ?"));
+    let mut stmt = try_500!(
+        db.prepare("SELECT exercise, picture_digest FROM exercise_corrections WHERE unit_id = ?")
+    );
     let mut rows = try_500!(stmt.query(params![unit_id]));
     let mut row = try_500!(rows.next());
     while let Some(r) = row {
@@ -221,7 +248,13 @@ enum ExerciseStudentState {
     Presented,
 }
 
-pub(crate) async fn change_exercise_state(req: Request<Body>, unit_id: u32, exercise: u32, db: &Mutex<Connection>, config: &Config) -> Response<Body> {
+pub(crate) async fn change_exercise_state(
+    req: Request<Body>,
+    unit_id: u32,
+    exercise: u32,
+    db: &Mutex<Connection>,
+    config: &Config,
+) -> Response<Body> {
     // Accessing this resource requires authentication.
     let student_id = try_401!(get_auth(&req, config));
 
@@ -235,13 +268,14 @@ pub(crate) async fn change_exercise_state(req: Request<Body>, unit_id: u32, exer
             let mut stmt = try_500!(db.prepare("DELETE FROM exercise_student_state WHERE student_id = ? AND unit_id = ? AND exercise = ?"));
             try_500!(stmt.execute(params![student_id, unit_id, exercise]));
             return empty(StatusCode::OK);
-        },
+        }
         ExerciseStudentState::Reserved => 0,
         ExerciseStudentState::Presented => 1,
     };
 
     let exercise_count: u32 = {
-        let mut stmt = try_500!(db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1"));
+        let mut stmt =
+            try_500!(db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1"));
         let mut rows = try_500!(stmt.query(params![unit_id]));
         let row = match try_500!(rows.next()) {
             Some(val) => val,
@@ -262,7 +296,13 @@ pub(crate) async fn change_exercise_state(req: Request<Body>, unit_id: u32, exer
     empty(StatusCode::OK)
 }
 
-pub(crate) async fn mark_exercise_blocked(req: Request<Body>, unit_id: u32, exercise: u32, db: &Mutex<Connection>, config: &Config) -> Response<Body> {
+pub(crate) async fn mark_exercise_blocked(
+    req: Request<Body>,
+    unit_id: u32,
+    exercise: u32,
+    db: &Mutex<Connection>,
+    config: &Config,
+) -> Response<Body> {
     // Accessing this resource requires authentication.
     try_401!(get_auth(&req, config));
 
@@ -270,9 +310,10 @@ pub(crate) async fn mark_exercise_blocked(req: Request<Body>, unit_id: u32, exer
     let blocked: bool = try_400!(serde_json::from_slice(&b));
 
     let db = db.lock().await;
-    
+
     let exercise_count: u32 = {
-        let mut stmt = try_500!(db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1"));
+        let mut stmt =
+            try_500!(db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1"));
         let mut rows = try_500!(stmt.query(params![unit_id]));
         let row = match try_500!(rows.next()) {
             Some(val) => val,
@@ -286,11 +327,17 @@ pub(crate) async fn mark_exercise_blocked(req: Request<Body>, unit_id: u32, exer
 
     let mut stmt = try_500!(db.prepare("INSERT INTO exercise_teacher_override (unit_id, index_, blocked) VALUES (?, ?, ?) ON CONFLICT (unit_id, index_) DO UPDATE SET blocked = ?"));
     try_500!(stmt.execute(params![unit_id, exercise, blocked, blocked]));
-    
+
     empty(StatusCode::OK)
 }
 
-pub(crate) async fn mark_exercise_corrected(req: Request<Body>, unit_id: u32, exercise: u32, db: &Mutex<Connection>, config: &Config) -> Response<Body> {
+pub(crate) async fn mark_exercise_corrected(
+    req: Request<Body>,
+    unit_id: u32,
+    exercise: u32,
+    db: &Mutex<Connection>,
+    config: &Config,
+) -> Response<Body> {
     // Accessing this resource requires authentication.
     let student_id = try_401!(get_auth(&req, config));
 
@@ -308,9 +355,10 @@ pub(crate) async fn mark_exercise_corrected(req: Request<Body>, unit_id: u32, ex
         };
         try_500!(row.get(0))
     };
-    
+
     let exercise_count: u32 = {
-        let mut stmt = try_500!(db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1"));
+        let mut stmt =
+            try_500!(db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1"));
         let mut rows = try_500!(stmt.query(params![unit_id]));
         let row = match try_500!(rows.next()) {
             Some(val) => val,
@@ -322,22 +370,33 @@ pub(crate) async fn mark_exercise_corrected(req: Request<Body>, unit_id: u32, ex
         return empty(StatusCode::NOT_FOUND);
     }
 
-    let field = if group_a { "corrected_a" } else { "corrected_b" };
+    let field = if group_a {
+        "corrected_a"
+    } else {
+        "corrected_b"
+    };
     let query = format!("INSERT INTO exercise_teacher_override (unit_id, index_, {}) VALUES (?, ?, ?) ON CONFLICT (unit_id, index_) DO UPDATE SET {} = ?", field, field);
     let mut stmt = try_500!(db.prepare(&query));
     try_500!(stmt.execute(params![unit_id, exercise, corrected, corrected]));
-    
+
     empty(StatusCode::OK)
 }
 
-pub(crate) async fn submit_exercise_correction(req: Request<Body>, unit_id: u32, exercise: u32, db: &Mutex<Connection>, config: &Config) -> Response<Body> {
+pub(crate) async fn submit_exercise_correction(
+    req: Request<Body>,
+    unit_id: u32,
+    exercise: u32,
+    db: &Mutex<Connection>,
+    config: &Config,
+) -> Response<Body> {
     // Accessing this resource requires authentication.
     let _ = try_401!(get_auth(&req, config));
 
     let db = db.lock().await;
 
     let exercise_count: u32 = {
-        let mut stmt = try_500!(db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1"));
+        let mut stmt =
+            try_500!(db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1"));
         let mut rows = try_500!(stmt.query(params![unit_id]));
         let row = match try_500!(rows.next()) {
             Some(val) => val,
@@ -350,8 +409,7 @@ pub(crate) async fn submit_exercise_correction(req: Request<Body>, unit_id: u32,
     }
 
     let b = try_400!(hyper::body::to_bytes(req).await);
-    let reader = try_400!(ImageReader::new(Cursor::new(b))
-        .with_guessed_format());
+    let reader = try_400!(ImageReader::new(Cursor::new(b)).with_guessed_format());
     let input = try_400!(reader.decode());
 
     let mut png = Vec::new();
@@ -366,27 +424,38 @@ pub(crate) async fn submit_exercise_correction(req: Request<Body>, unit_id: u32,
     let digest_base64 = base64::encode_config(digest.as_slice(), base64::URL_SAFE_NO_PAD);
 
     {
-        let mut stmt = try_500!(db.prepare("INSERT INTO exercise_corrections (unit_id, exercise, picture_digest) VALUES (?, ?, ?)"));
+        let mut stmt = try_500!(db.prepare(
+            "INSERT INTO exercise_corrections (unit_id, exercise, picture_digest) VALUES (?, ?, ?)"
+        ));
         if let Err(err) = stmt.execute(params![unit_id, exercise, digest_base64]) {
             match err {
-                SqliteError::SqliteFailure(rusqlite::ffi::Error { code: SqliteErrorCode::ConstraintViolation, .. }, _)  => {
+                SqliteError::SqliteFailure(
+                    rusqlite::ffi::Error {
+                        code: SqliteErrorCode::ConstraintViolation,
+                        ..
+                    },
+                    _,
+                ) => {
                     // The unique constraint is violated: the correction already exists.
                     return empty(StatusCode::CONFLICT);
                 }
                 _ => {
                     eprintln!("Error while inserting correction: {:?}", err);
                     return empty(StatusCode::INTERNAL_SERVER_ERROR);
-                },
+                }
             }
         }
     }
 
-    let p = config.corrections_path.join(format!("{}.png", digest_base64));
+    let p = config
+        .corrections_path
+        .join(format!("{}.png", digest_base64));
     let mut png_file = match OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(p)
-        .await {
+        .await
+    {
         Ok(val) => val,
         Err(err) => {
             if err.kind() == ErrorKind::AlreadyExists {
