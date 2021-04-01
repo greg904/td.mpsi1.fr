@@ -381,10 +381,11 @@ pub(crate) async fn submit_exercise_correction(req: Request<Body>, unit_id: u32,
         }
     }
 
+    let p = config.corrections_path.join(format!("{}.png", digest_base64));
     let mut png_file = match OpenOptions::new()
         .write(true)
         .create_new(true)
-        .open(format!("corrections/{}.png", digest_base64))
+        .open(p)
         .await {
         Ok(val) => val,
         Err(err) => {
