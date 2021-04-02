@@ -1,11 +1,11 @@
 import { h, JSX } from 'preact'
 
-import Unit from './Unit'
+import * as net from './net'
 
 export interface Props {
-  unit: Unit
+  unit: net.Unit
   groupA: boolean
-  onClickEdit: () => void
+  onClickEdit?: () => void
 }
 
 export function UnitCard (props: Props): JSX.Element {
@@ -13,7 +13,8 @@ export function UnitCard (props: Props): JSX.Element {
 
   const onClickEdit = (e: MouseEvent): void => {
     e.preventDefault()
-    props.onClickEdit()
+
+    if (props.onClickEdit != null) { props.onClickEdit() }
   }
 
   return (

@@ -10,7 +10,7 @@ enum Alert {
 }
 
 export interface LogInFormProps {
-  onSuccess: (userToken: string) => void
+  onSuccess: (authToken: string) => void
 }
 
 export function LogInForm (props: LogInFormProps): JSX.Element {
@@ -50,12 +50,12 @@ export function LogInForm (props: LogInFormProps): JSX.Element {
     setLoading(true)
 
     try {
-      const userToken = await net.logIn(username, password)
-      if (userToken === null) {
+      const authToken = await net.logIn(username, password)
+      if (authToken === null) {
         setAlert(Alert.InvalidCreds)
         setLoading(false)
       } else {
-        props.onSuccess(userToken)
+        props.onSuccess(authToken)
       }
     } catch (err) {
       console.error('Error while trying to log in.', err)

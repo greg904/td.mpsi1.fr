@@ -203,9 +203,9 @@ export async function modifyExercise (authToken: string, unitId: number, exercis
     method: 'POST',
     headers: {
       Authorization: `Bearer ${authToken}`,
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/json'
     },
-    body: JSON.stringify(changes),
+    body: JSON.stringify(changes)
   })
 
   if (res.status === 401) {
@@ -216,4 +216,3 @@ export async function modifyExercise (authToken: string, unitId: number, exercis
     throw new ResponseNotOkError()
   }
 }
-
