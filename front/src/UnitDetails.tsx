@@ -1,5 +1,6 @@
-import { Fragment, h, JSX } from 'preact'
+import { Fragment, JSX } from 'preact'
 import { useEffect, useState } from 'preact/hooks'
+import { Link } from 'react-router-dom'
 
 import { ExerciseCard } from './ExerciseCard'
 import Loader from './Loader'
@@ -119,10 +120,20 @@ export function UnitDetails (props: UnitDetailsProps): JSX.Element {
           >
             Marquer comme corrigé
           </button>
+          <Link
+            className='btn btn-secondary mb-1 me-1'
+            to={`/chapitres/${props.unitId}/exercices/${i}/ajouter-correction`}
+          >
+            Ajouter une photo de correction
+          </Link>
         </ExerciseCard>
       </div>
     )
   })
 
-  return <Fragment>{exerciseDivs}</Fragment>
+  return (
+    <Fragment>
+      {exerciseDivs}
+    </Fragment>
+  )
 }

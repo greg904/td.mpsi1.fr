@@ -198,14 +198,32 @@ export async function fetchExercisesInUnit (authToken: string, unitId: number): 
   return json
 }
 
-export async function modifyExercise (authToken: string, unitId: number, exerciseId: number, what: string, changes: any): Promise<void> {
-  const res = await fetch(`${config.apiEndpoint}units/${unitId}/exercises/${exerciseId}/${what}`, {
+export async function modifyExercise (authToken: string, unitId: number, exerciseIndex: number, what: string, changes: any): Promise<void> {
+  const res = await fetch(`${config.apiEndpoint}units/${unitId}/exercises/${exerciseIndex}/${what}`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${authToken}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(changes)
+  })
+
+  if (res.status === 401) {
+    throw new InvalidAuthTokenError()
+  }
+
+  if (!res.ok) {
+    throw new ResponseNotOkError()
+  }
+}
+
+export async function submitExerciseCorrection (authToken: string, unitId: number, exerciseIndex: number, file: File): Promise<void> {
+  const res = await fetch(`${config.apiEndpoint}units/${unitId}/exercises/${exerciseIndex}/corrections`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${authToken}`
+    },
+    body: file
   })
 
   if (res.status === 401) {

@@ -12,6 +12,7 @@ import Loader from './Loader'
 import { UnitDetails } from './UnitDetails'
 import { Welcome } from './Welcome'
 import { UnitListing } from './UnitListing'
+import { UploadCorrectionPage } from './UploadCorrectionPage'
 
 interface UnitDetailsRouteProps {
   groupA: boolean
@@ -19,11 +20,11 @@ interface UnitDetailsRouteProps {
 }
 
 function UnitDetailsRoute (props: UnitDetailsRouteProps): JSX.Element {
-  const { id }: { id?: string } = useParams()
+  const { unitId }: { unitId?: string } = useParams()
 
   return (
     <UnitDetails
-      unitId={parseInt(id as string)}
+      unitId={parseInt(unitId as string)}
       groupA={props.groupA}
       authToken={props.authToken}
     />
@@ -80,11 +81,14 @@ function App (): JSX.Element {
   return (
     <BrowserRouter>
       <Switch>
-        <Route path='/chapitres/:id(\d+)' exact>
+        <Route path='/chapitres/:unitId(\d+)' exact>
           <UnitDetailsRoute
             groupA={student.groupA}
             authToken={authToken}
           />
+        </Route>
+        <Route path='/chapitres/:unitId(\d+)/exercices/:exerciseIndex(\d+)/ajouter-correction' exact>
+          <UploadCorrectionPage authToken={authToken} />
         </Route>
         <Route path='/' exact>
           <Welcome student={student} />
