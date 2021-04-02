@@ -1,0 +1,8 @@
+{
+  "presets": ["@parcel/babel-preset-env"],
+  "plugins": [
+    ["@babel/plugin-transform-runtime", { "regenerator": true }],
+    ["@babel/plugin-transform-typescript", { "isTSX": true }],
+    ["@babel/plugin-transform-react-jsx", { "runtime": "automatic", "importSource": "preact" }]
+  ]
+}

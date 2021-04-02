@@ -1,4 +1,4 @@
-import { h, Fragment, JSX } from 'preact'
+import { Fragment, JSX } from 'preact'
 
 import { UnitCard } from './UnitCard'
 import * as net from './net'
@@ -8,8 +8,6 @@ export interface Props {
 
   // Whether or not we are in group A.
   groupA: boolean
-
-  onSelectUnit?: (index: number) => void
 }
 
 export function UnitListing (props: Props): JSX.Element {
@@ -21,9 +19,6 @@ export function UnitListing (props: Props): JSX.Element {
         <UnitCard
           unit={u}
           groupA={props.groupA}
-          onClickEdit={() => {
-            if (props.onSelectUnit != null) { props.onSelectUnit(i) }
-          }}
         />
       </div>
     )

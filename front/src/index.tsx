@@ -1,13 +1,34 @@
 import 'bootstrap'
 import 'bootstrap/dist/css/bootstrap.css' // Import precompiled Bootstrap css
 
-import { render, h, JSX } from 'preact'
+import { render, JSX } from 'preact'
 import { useState, useEffect } from 'preact/hooks'
+import { BrowserRouter, Route, Switch, useParams } from 'react-router-dom'
+
 import { LogInForm } from './LogInForm'
 import useStickyState from './use-sticky-state'
 import * as net from './net'
 import Loader from './Loader'
 import { UnitDetails } from './UnitDetails'
+import { Welcome } from './Welcome'
+import { UnitListing } from './UnitListing'
+
+interface UnitDetailsRouteProps {
+  groupA: boolean
+  authToken: string
+}
+
+function UnitDetailsRoute (props: UnitDetailsRouteProps): JSX.Element {
+  const { id }: { id?: string } = useParams()
+
+  return (
+    <UnitDetails
+      unitId={parseInt(id as string)}
+      groupA={props.groupA}
+      authToken={props.authToken}
+    />
+  )
+}
 
 function App (): JSX.Element {
   const [authToken, setAuthToken] = useStickyState('token')
@@ -57,17 +78,24 @@ function App (): JSX.Element {
   }
 
   return (
-    <UnitDetails
-      unitId={1}
-      groupA={student.groupA}
-      authToken={authToken}
-    />
+    <BrowserRouter>
+      <Switch>
+        <Route path='/chapitres/:id(\d+)' exact>
+          <UnitDetailsRoute
+            groupA={student.groupA}
+            authToken={authToken}
+          />
+        </Route>
+        <Route path='/' exact>
+          <Welcome student={student} />
+          <UnitListing
+            units={units}
+            groupA={student.groupA}
+          />
+        </Route>
+      </Switch>
+    </BrowserRouter>
   )
-
-  // return <Fragment>
-  //   <Welcome student={student} />
-  //   <UnitListing units={units} groupA={student.groupA} />
-  // </Fragment>
 }
 
 function runApp (): void {
