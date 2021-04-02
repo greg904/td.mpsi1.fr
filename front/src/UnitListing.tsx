@@ -1,10 +1,10 @@
 import { h, Fragment, JSX } from 'preact'
 
-import Unit from './Unit'
 import { UnitCard } from './UnitCard'
+import * as net from './net'
 
 export interface Props {
-  units: Unit[]
+  units: net.Unit[]
   groupA: boolean
   onSelectUnit: (index: number) => void
 }

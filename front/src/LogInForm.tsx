@@ -1,20 +1,21 @@
 import { h, JSX } from 'preact'
 import { useState } from 'preact/hooks'
 
-import * as config from './config'
+import * as net from './net'
 
 enum Alert {
+  None,
   InvalidCreds,
   Error,
 }
 
-export interface Props {
-  onSuccess: (token: string) => void
+export interface LogInFormProps {
+  onSuccess: (userToken: string) => void
 }
 
-export function LogInForm (props: Props): JSX.Element {
+export function LogInForm (props: LogInFormProps): JSX.Element {
   const [loading, setLoading] = useState(false)
-  const [alert, setAlert] = useState<Alert | undefined>(undefined)
+  const [alert, setAlert] = useState<Alert>(Alert.None)
   const [wasValidated, setWasValidated] = useState<boolean>(false)
 
   let loader = null
@@ -27,45 +28,37 @@ export function LogInForm (props: Props): JSX.Element {
   }
 
   let alertDiv = null
-  if (alert !== undefined) {
+  if (alert !== Alert.None) {
+    let text
+    switch (alert) {
+      case Alert.InvalidCreds:
+        text = 'Identifiants invalides.'
+        break
+      case Alert.Error:
+        text = 'Une erreur est survenue.'
+        break
+    }
+
     alertDiv = (
       <div class='alert alert-danger' role='alert'>
-        {alert === Alert.InvalidCreds ? 'Identifiants invalides.' : 'Une erreur est survenue.'}
+        {text}
       </div>
     )
   }
 
-  const doLogin = async (lastName: string, password: string): Promise<void> => {
+  const doLogIn = async (username: string, password: string): Promise<void> => {
     setLoading(true)
 
     try {
-      const username = lastName
-        .replace(/\W+/, '-')
-        .toLowerCase()
-
-      const res = await fetch(`${config.apiEndpoint}log-in`, {
-        method: 'POST',
-        body: JSON.stringify({
-          username,
-          password
-        })
-      })
-
-      if (res.status === 401) {
+      const userToken = await net.logIn(username, password)
+      if (userToken === null) {
         setAlert(Alert.InvalidCreds)
         setLoading(false)
-        return
-      } else if (res.status !== 200) {
-        setAlert(Alert.Error)
-        setLoading(false)
-        return
+      } else {
+        props.onSuccess(userToken)
       }
-
-      const json = await res.json()
-      if (typeof json !== 'string') { throw new Error('Invalid log in response') }
-      props.onSuccess(json)
     } catch (err) {
-      console.error('Failed to log in', err)
+      console.error('Error while trying to log in.', err)
       setAlert(Alert.Error)
       setLoading(false)
     }
@@ -81,10 +74,14 @@ export function LogInForm (props: Props): JSX.Element {
     }
     setWasValidated(false)
 
-    const formData = new FormData(e.target as HTMLFormElement)
+    const formData = new FormData(form)
     const lastName = formData.get('last-name') as string
     const password = formData.get('password') as string
-    doLogin(lastName, password).catch(() => {})
+
+    const username = lastName
+      .replace(/\W+/, '-')
+      .toLowerCase()
+    doLogIn(username, password).catch(() => {})
   }
 
   return (

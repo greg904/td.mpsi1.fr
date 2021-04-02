@@ -1,21 +1,19 @@
 import { Fragment, h, JSX } from 'preact'
 import { useState } from 'preact/hooks'
 
-import Exercise from './Exercise'
-import Student from './Student'
-import * as config from './config'
+import * as net from './net'
 
 export interface Props {
   token: string
-  student: Student
+  student: net.Student
   unitId: number
-  exercise: Exercise
+  exercise: net.Exercise
   exerciseIndex: number
   groupA: boolean
-  onUpdate: (newExercise: Exercise) => void
+  onUpdate: (newExercise: net.Exercise) => void
 }
 
-function renderStudentInline (s: Student): JSX.Element {
+function renderStudentInline (s: net.Student): JSX.Element {
   const group = s.groupA ? 'pair' : 'impair'
   return <li>{s.fullName} (groupe {group})</li>
 }
@@ -99,19 +97,7 @@ export function ExerciseCard (props: Props): JSX.Element {
     setLoading(true)
 
     try {
-      const res = await fetch(`${config.apiEndpoint}units/${props.unitId}/exercises/${props.exerciseIndex}/state`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${props.token}`
-        },
-        body: JSON.stringify(state)
-      })
-
-      if (!res.ok) {
-        setError(true)
-        setLoading(false)
-        return
-      }
+      await net.modifyExercise(props.token, props.unitId, props.exerciseIndex, 'state', state)
 
       cb()
       setLoading(false)
@@ -126,19 +112,7 @@ export function ExerciseCard (props: Props): JSX.Element {
     setLoading(true)
 
     try {
-      const res = await fetch(`${config.apiEndpoint}units/${props.unitId}/exercises/${props.exerciseIndex}/corrected`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${props.token}`
-        },
-        body: JSON.stringify(corrected)
-      })
-
-      if (!res.ok) {
-        setError(true)
-        setLoading(false)
-        return
-      }
+      await net.modifyExercise(props.token, props.unitId, props.exerciseIndex, 'corrected', corrected)
 
       const newExercise = Object.assign({}, props.exercise)
       if (props.groupA) {
@@ -160,19 +134,7 @@ export function ExerciseCard (props: Props): JSX.Element {
     setLoading(true)
 
     try {
-      const res = await fetch(`${config.apiEndpoint}units/${props.unitId}/exercises/${props.exerciseIndex}/blocked`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${props.token}`
-        },
-        body: JSON.stringify(blocked)
-      })
-
-      if (!res.ok) {
-        setError(true)
-        setLoading(false)
-        return
-      }
+      await net.modifyExercise(props.token, props.unitId, props.exerciseIndex, 'blocked', blocked)
 
       const newExercise = Object.assign({}, props.exercise)
       newExercise.blocked = blocked

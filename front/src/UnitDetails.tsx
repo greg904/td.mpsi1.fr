@@ -1,34 +1,23 @@
 import { Fragment, h, JSX } from 'preact'
 import { useEffect, useState } from 'preact/hooks'
 
-import Exercise from './Exercise'
 import { ExerciseCard } from './ExerciseCard'
-import Student from './Student'
-import Unit from './Unit'
-import * as config from './config'
+import * as net from './net'
 
 export interface Props {
   token: string
-  student: Student
-  unit: Unit
+  student: net.Student
+  unit: net.Unit
   groupA: boolean
 }
 
 export function UnitDetails (props: Props): JSX.Element {
-  const [exercises, setExercises] = useState<Exercise[] | undefined>(undefined)
+  const [exercises, setExercises] = useState<net.Exercise[] | undefined>(undefined)
   const [error, setError] = useState(false)
 
   useEffect(() => {
     const fetchExercises = async (): Promise<void> => {
-      const res = await fetch(`${config.apiEndpoint}units/${props.unit.id}/exercises`, {
-        headers: {
-          Authorization: `Bearer ${props.token}`
-        }
-      })
-      const json = await res.json()
-      if (!Array.isArray(json)) { throw new Error('Invalid unit exercise list response') }
-      // TODO: validate
-      setExercises(json as Exercise[])
+      setExercises(await net.fetchExercisesInUnit(props.token, props.unit.id))
     }
     fetchExercises()
       .catch(err => {
@@ -58,7 +47,7 @@ export function UnitDetails (props: Props): JSX.Element {
       {exercises.map((e, i) => {
         const last = i === exercises.length - 1
 
-        const onUpdate = (newExercise: Exercise): void => {
+        const onUpdate = (newExercise: net.Exercise): void => {
           setExercises(old => {
             if (old === undefined) { return undefined }
             const tmp = [...old]
