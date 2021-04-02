@@ -6,4 +6,8 @@ export default interface Exercise {
     blocked: boolean
     correctedA: boolean
     correctedB: boolean
+
+    // A list of digests for the pictures with the correction for that
+    // exercise.
+    correctionDigests: string[]
 }

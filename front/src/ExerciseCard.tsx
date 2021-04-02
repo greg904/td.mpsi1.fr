@@ -45,6 +45,18 @@ export function ExerciseCard(props: Props) {
         </Fragment>
     }
 
+    let correctionPictures = null
+    if (props.exercise.correctionDigests.length !== 0) {
+        correctionPictures = <Fragment>
+            <h6 class="mb-2 text-muted">Correction</h6>
+            {props.exercise.correctionDigests.map(d => {
+                return <img
+                    src={`https://td-corr.mpsi1.fr/${d}.png`}
+                    class="img-fluid d-block rounded mx-auto mb-2"/>
+            })}
+        </Fragment>
+    }
+
     let reservedText = null
     if (props.exercise.reservedBy.length !== 0) {
         reservedText = <Fragment>
@@ -251,6 +263,7 @@ export function ExerciseCard(props: Props) {
             <p class="card-text">
                 {blockedText}
                 {correctedText}
+                {correctionPictures}
                 {reservedText}
                 {presentedText}
             </p>
