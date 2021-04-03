@@ -11,30 +11,6 @@ use crate::config::Config;
 
 type HmacSha256 = Hmac<Sha256>;
 
-macro_rules! r#try_400 {
-    ($expr:expr $(,)?) => {
-        match $expr {
-            Ok(val) => val,
-            Err(err) => {
-                eprintln!("Bad request: {:?}", err);
-                return $crate::http_helpers::empty(::http::StatusCode::BAD_REQUEST);
-            }
-        }
-    };
-}
-
-macro_rules! r#try_401 {
-    ($expr:expr $(,)?) => {
-        match $expr {
-            Ok(val) => val,
-            Err(err) => {
-                eprintln!("Auth failed in request: {:?}", err);
-                return $crate::http_helpers::empty(::http::StatusCode::UNAUTHORIZED);
-            }
-        }
-    };
-}
-
 pub(crate) fn empty(status: StatusCode) -> Response<Body> {
     Response::builder()
         .status(status)

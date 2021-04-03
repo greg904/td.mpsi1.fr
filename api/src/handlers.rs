@@ -303,30 +303,61 @@ enum ExerciseStudentState {
     Presented,
 }
 
-pub(crate) async fn change_exercise_state(
-    req: Request<Body>,
+#[derive(Deserialize)]
+struct PatchExerciseRequest {
+    #[serde(rename = "stateForMe")]
+    state_for_me: Option<ExerciseStudentState>,
+    blocked: Option<bool>,
+    #[serde(rename = "teacherCorrectedForMyGroup")]
+    teacher_corrected_for_my_group: Option<bool>,
+}
+
+pub(crate) async fn patch_exercise(
+    mut req: Request<Body>,
     unit_id: u32,
     exercise_index: u32,
     db: &Mutex<Connection>,
     config: &Config,
 ) -> Response<Body> {
-    // Accessing this resource requires authentication.
-    let student_id = try_401!(get_logged_in_user_id(&req, config));
-
-    let b = try_400!(hyper::body::to_bytes(req).await);
-    let new_state: ExerciseStudentState = try_400!(serde_json::from_slice(&b));
-
-    let db = db.lock().await;
-
-    let new_state: u32 = match new_state {
-        ExerciseStudentState::None => {
-            let mut stmt = db.prepare("DELETE FROM exercise_student_state WHERE student_id = ? AND unit_id = ? AND exercise = ?").unwrap();
-            stmt.execute(params![student_id, unit_id, exercise_index]).unwrap();
-            return empty(StatusCode::OK);
+    let student_id = match get_logged_in_user_id(&req, config) {
+        Ok(val) => val,
+        Err(err) => {
+            warn_for_req(
+                &req,
+                config,
+                &format!(
+                    "exercise correction submission with invalid authentication: {:?}",
+                    err
+                ),
+            );
+            return empty(StatusCode::FORBIDDEN);
         }
-        ExerciseStudentState::Reserved => 0,
-        ExerciseStudentState::Presented => 1,
     };
+
+    let b = match collect_body(req.body_mut(), 1024).await {
+        Ok(val) => val,
+        Err(CollectBodyError::ReadError(err)) => {
+            warn_for_req(
+                &req,
+                config,
+                &format!("failed to read body from log in request: {:?}", err),
+            );
+            return empty(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        Err(CollectBodyError::TooLarge) => {
+            warn_for_req(&req, config, "log in request body is too large");
+            return empty(StatusCode::PAYLOAD_TOO_LARGE);
+        }
+    };
+    let r: PatchExerciseRequest = match serde_json::from_slice(&b) {
+        Ok(val) => val,
+        Err(err) => {
+            warn_for_req(&req, config, &format!("log in request is invalid: {:?}", err));
+            return empty(StatusCode::BAD_REQUEST);
+        }
+    };
+
+    let db = db.lock().await;
 
     let exercise_count: u32 = {
         let mut stmt =
@@ -342,97 +373,46 @@ pub(crate) async fn change_exercise_state(
         return empty(StatusCode::NOT_FOUND);
     }
 
-    let mut stmt = db.prepare("INSERT OR REPLACE INTO exercise_student_state (student_id, unit_id, exercise, state) VALUES (?, ?, ?, ?)").unwrap();
-    let updated_count = stmt.execute(params![student_id, unit_id, exercise_index, new_state]).unwrap();
-    if updated_count == 0 {
-        return empty(StatusCode::NOT_FOUND);
+    if let Some(my_state) = r.state_for_me {
+        let my_state: u32 = match my_state {
+            ExerciseStudentState::None => {
+                let mut stmt = db.prepare("DELETE FROM exercise_student_state WHERE student_id = ? AND unit_id = ? AND exercise = ?").unwrap();
+                stmt.execute(params![student_id, unit_id, exercise_index]).unwrap();
+                return empty(StatusCode::OK);
+            }
+            ExerciseStudentState::Reserved => 0,
+            ExerciseStudentState::Presented => 1,
+        };
+
+        let mut stmt = db.prepare("INSERT OR REPLACE INTO exercise_student_state (student_id, unit_id, exercise, state) VALUES (?, ?, ?, ?)").unwrap();
+        stmt.execute(params![student_id, unit_id, exercise_index, my_state]).unwrap();
     }
 
-    empty(StatusCode::OK)
-}
-
-pub(crate) async fn mark_exercise_blocked(
-    req: Request<Body>,
-    unit_id: u32,
-    exercise: u32,
-    db: &Mutex<Connection>,
-    config: &Config,
-) -> Response<Body> {
-    // Accessing this resource requires authentication.
-    try_401!(get_logged_in_user_id(&req, config));
-
-    let b = try_400!(hyper::body::to_bytes(req).await);
-    let blocked: bool = try_400!(serde_json::from_slice(&b));
-
-    let db = db.lock().await;
-
-    let exercise_count: u32 = {
-        let mut stmt =
-            db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1").unwrap();
-        let mut rows = stmt.query(params![unit_id]).unwrap();
-        let row = match rows.next().unwrap() {
-            Some(val) => val,
-            None => return empty(StatusCode::NOT_FOUND),
-        };
-        row.get(0).unwrap()
-    };
-    if exercise >= exercise_count {
-        return empty(StatusCode::NOT_FOUND);
+    if let Some(blocked) = r.blocked {
+        let mut stmt = db.prepare("INSERT INTO exercise (unit_id, index_, blocked) VALUES (?, ?, ?) ON CONFLICT (unit_id, index_) DO UPDATE SET blocked = ?").unwrap();
+        stmt.execute(params![unit_id, exercise_index, blocked, blocked]).unwrap();
     }
 
-    let mut stmt = db.prepare("INSERT INTO exercise (unit_id, index_, blocked) VALUES (?, ?, ?) ON CONFLICT (unit_id, index_) DO UPDATE SET blocked = ?").unwrap();
-    stmt.execute(params![unit_id, exercise, blocked, blocked]).unwrap();
-
-    empty(StatusCode::OK)
-}
-
-pub(crate) async fn mark_exercise_corrected(
-    req: Request<Body>,
-    unit_id: u32,
-    exercise_index: u32,
-    db: &Mutex<Connection>,
-    config: &Config,
-) -> Response<Body> {
-    // Accessing this resource requires authentication.
-    let student_id = try_401!(get_logged_in_user_id(&req, config));
-
-    let b = try_400!(hyper::body::to_bytes(req).await);
-    let corrected: bool = try_400!(serde_json::from_slice(&b));
-
-    let db = db.lock().await;
-
-    let in_group_even: bool = {
-        let mut stmt = db.prepare("SELECT in_group_even FROM students WHERE id = ?").unwrap();
-        let mut rows = stmt.query(params![student_id]).unwrap();
-        let row = match rows.next().unwrap() {
-            Some(val) => val,
-            None => return empty(StatusCode::UNAUTHORIZED),
+    if let Some(teacher_corrected_for_my_group) = r.teacher_corrected_for_my_group {
+        let in_group_even: bool = {
+            let mut stmt = db.prepare("SELECT in_group_even FROM students WHERE id = ?").unwrap();
+            let mut rows = stmt.query(params![student_id]).unwrap();
+            let row = match rows.next().unwrap() {
+                Some(val) => val,
+                None => return empty(StatusCode::UNAUTHORIZED),
+            };
+            row.get(0).unwrap()
         };
-        row.get(0).unwrap()
-    };
 
-    let exercise_count: u32 = {
-        let mut stmt =
-            db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1").unwrap();
-        let mut rows = stmt.query(params![unit_id]).unwrap();
-        let row = match rows.next().unwrap() {
-            Some(val) => val,
-            None => return empty(StatusCode::NOT_FOUND),
+        let field = if in_group_even {
+            "teacher_corrected_for_group_even"
+        } else {
+            "teacher_corrected_for_group_odd"
         };
-        row.get(0).unwrap()
-    };
-    if exercise_index >= exercise_count {
-        return empty(StatusCode::NOT_FOUND);
+        let query = format!("INSERT INTO exercise (unit_id, index_, {0}) VALUES (?, ?, ?) ON CONFLICT (unit_id, index_) DO UPDATE SET {0} = ?", field);
+        let mut stmt = db.prepare(&query).unwrap();
+        stmt.execute(params![unit_id, exercise_index, teacher_corrected_for_my_group, teacher_corrected_for_my_group]).unwrap();
     }
-
-    let field = if in_group_even {
-        "teacher_corrected_for_group_even"
-    } else {
-        "teacher_corrected_for_group_odd"
-    };
-    let query = format!("INSERT INTO exercise (unit_id, index_, {}) VALUES (?, ?, ?) ON CONFLICT (unit_id, index_) DO UPDATE SET {} = ?", field, field);
-    let mut stmt = db.prepare(&query).unwrap();
-    stmt.execute(params![unit_id, exercise_index, corrected, corrected]).unwrap();
 
     empty(StatusCode::OK)
 }

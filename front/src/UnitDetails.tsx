@@ -79,19 +79,19 @@ export function UnitDetails (props: UnitDetailsProps): JSX.Element {
         studentInGroupEven={props.studentInGroupEven}
         actionPending={exercisesWithPendingAction.includes(i)}
         onReserve={() => {
-          doUpdate(async () => await net.modifyExercise(props.authToken, props.unitId, i, 'state', 'reserved'))
+          doUpdate(async () => await net.patchExercise(props.authToken, props.unitId, i, { stateForMe: 'reserved' }))
         }}
         onMarkPresented={() => {
-          doUpdate(async () => await net.modifyExercise(props.authToken, props.unitId, i, 'state', 'presented'))
+          doUpdate(async () => await net.patchExercise(props.authToken, props.unitId, i, { stateForMe: 'presented' }))
         }}
         onReset={() => {
-          doUpdate(async () => await net.modifyExercise(props.authToken, props.unitId, i, 'state', 'none'))
+          doUpdate(async () => await net.patchExercise(props.authToken, props.unitId, i, { stateForMe: 'none' }))
         }}
         onSetBlocked={blocked => {
-          doUpdate(async () => await net.modifyExercise(props.authToken, props.unitId, i, 'blocked', blocked))
+          doUpdate(async () => await net.patchExercise(props.authToken, props.unitId, i, { blocked }))
         }}
         onSetCorrectedByTeacher={corrected => {
-          doUpdate(async () => await net.modifyExercise(props.authToken, props.unitId, i, 'corrected', corrected))
+          doUpdate(async () => await net.patchExercise(props.authToken, props.unitId, i, { teacherCorrectedForMyGroup: corrected }))
         }}
         onClickCorrectionPictureDelete={digest => {
           doUpdate(async () => await net.deleteExerciseCorrection(props.authToken, props.unitId, i, digest))

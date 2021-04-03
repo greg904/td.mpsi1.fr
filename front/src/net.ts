@@ -216,9 +216,9 @@ export async function fetchExercisesInUnit (authToken: string, unitId: number): 
   return json
 }
 
-export async function modifyExercise (authToken: string, unitId: number, exerciseIndex: number, what: string, changes: any): Promise<void> {
-  const res = await fetch(`${config.apiEndpoint}units/${unitId}/exercises/${exerciseIndex}/${what}`, {
-    method: 'POST',
+export async function patchExercise (authToken: string, unitId: number, exerciseIndex: number, changes: any): Promise<void> {
+  const res = await fetch(`${config.apiEndpoint}units/${unitId}/exercises/${exerciseIndex}`, {
+    method: 'PATCH',
     headers: {
       Authorization: `Bearer ${authToken}`,
       'Content-Type': 'application/json'

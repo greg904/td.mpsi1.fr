@@ -50,45 +50,6 @@ impl Globals {
                                         exercise_index_str.parse::<u32>().ok()
                                     {
                                         match segments.next() {
-                                            Some("state")
-                                                if req.method() == http::Method::POST
-                                                    && segments.next().is_none() =>
-                                            {
-                                                return handlers::change_exercise_state(
-                                                    req,
-                                                    unit_id,
-                                                    exercise_index,
-                                                    &self.db,
-                                                    &self.config,
-                                                )
-                                                .await
-                                            }
-                                            Some("blocked")
-                                                if req.method() == http::Method::POST
-                                                    && segments.next().is_none() =>
-                                            {
-                                                return handlers::mark_exercise_blocked(
-                                                    req,
-                                                    unit_id,
-                                                    exercise_index,
-                                                    &self.db,
-                                                    &self.config,
-                                                )
-                                                .await
-                                            }
-                                            Some("corrected")
-                                                if req.method() == http::Method::POST
-                                                    && segments.next().is_none() =>
-                                            {
-                                                return handlers::mark_exercise_corrected(
-                                                    req,
-                                                    unit_id,
-                                                    exercise_index,
-                                                    &self.db,
-                                                    &self.config,
-                                                )
-                                                .await
-                                            }
                                             Some("corrections") => {
                                                 match segments.next() {
                                                     Some(correction_digest)
@@ -112,6 +73,7 @@ impl Globals {
                                                     _ => {}
                                                 }
                                             }
+                                            None if req.method() == http::Method::PATCH => return handlers::patch_exercise(req, unit_id, exercise_index, &self.db, &self.config).await,
                                             _ => {}
                                         }
                                     }
