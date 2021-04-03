@@ -19,7 +19,7 @@ interface UnitDetailsRouteProps {
   authToken: string
   units: net.Unit[]
   studentId: number
-  studentInEvenGroup: boolean
+  studentInGroupEven: boolean
   onInvalidAuthToken?: () => void
 }
 
@@ -40,7 +40,7 @@ function UnitDetailsRoute (props: UnitDetailsRouteProps): JSX.Element {
       <UnitDetails
         unitId={unitId}
         studentId={props.studentId}
-        studentInEvenGroup={props.studentInEvenGroup}
+        studentInGroupEven={props.studentInGroupEven}
         authToken={props.authToken}
         onInvalidAuthToken={props.onInvalidAuthToken}
       />
@@ -129,7 +129,7 @@ function App (): JSX.Element {
 
   const now = new Date().valueOf()
   const relevantUnits = units.filter(u => {
-    const minDeadline = Math.min(u.deadlineA.valueOf(), u.deadlineB.valueOf())
+    const minDeadline = Math.min(u.deadlineGroupEven.valueOf(), u.deadlineGroupOdd.valueOf())
     // The deadline is at the end of the day.
     return now < minDeadline + 1000 * 60 * 60 * 24
   })
@@ -141,7 +141,7 @@ function App (): JSX.Element {
           <UnitDetailsRoute
             units={units}
             studentId={student.id}
-            studentInEvenGroup={student.groupA}
+            studentInGroupEven={student.inGroupEven}
             authToken={authToken}
             onInvalidAuthToken={() => {
               // User has to log in again.
@@ -167,12 +167,12 @@ function App (): JSX.Element {
           </nav>
           <Welcome
             studentFullName={student.fullName}
-            studentInEvenGroup={student.groupA}
+            studentInGroupEven={student.inGroupEven}
             onClickDisconnect={() => setAuthToken(null)}
           />
           <UnitListing
             units={relevantUnits}
-            studentInEvenGroup={student.groupA}
+            sstudentInGroupEven={student.inGroupEven}
           />
         </Route>
       </Switch>

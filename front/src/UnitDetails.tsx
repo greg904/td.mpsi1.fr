@@ -11,7 +11,7 @@ export interface UnitDetailsProps {
   unitId: number
   authToken: string
   studentId: number
-  studentInEvenGroup: boolean
+  studentInGroupEven: boolean
   onInvalidAuthToken?: () => void
 }
 
@@ -69,14 +69,14 @@ export function UnitDetails (props: UnitDetailsProps): JSX.Element {
         key={i}
         unitId={props.unitId}
         exerciseIndex={i}
-        correctionImages={e.correctionDigests}
+        correctionImages={e.correctionImages}
         presentedBy={e.presentedBy}
         reservedBy={e.reservedBy}
-        correctedInEvenGroup={e.correctedA}
-        correctedInOddGroup={e.correctedB}
+        teacherCorrectedForGroupEven={e.teacherCorrectedForGroupEven}
+        teacherCorrectedForGroupOdd={e.teacherCorrectedForGroupOdd}
         blocked={e.blocked}
         studentId={props.studentId}
-        studentInEvenGroup={props.studentInEvenGroup}
+        studentInGroupEven={props.studentInGroupEven}
         actionPending={exercisesWithPendingAction.includes(i)}
         onReserve={() => {
           doUpdate(async () => await net.modifyExercise(props.authToken, props.unitId, i, 'state', 'reserved'))

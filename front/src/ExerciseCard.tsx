@@ -13,11 +13,11 @@ export interface Props {
   correctionImages: string[]
   reservedBy: net.Student[]
   presentedBy: net.Student[]
-  correctedInEvenGroup: boolean
-  correctedInOddGroup: boolean
+  teacherCorrectedForGroupEven: boolean
+  teacherCorrectedForGroupOdd: boolean
   blocked: boolean
   studentId: number
-  studentInEvenGroup: boolean
+  studentInGroupEven: boolean
   actionPending: boolean
   onReserve?: () => void
   onMarkPresented?: () => void
@@ -28,7 +28,7 @@ export interface Props {
 }
 
 function renderStudent (s: net.Student): string {
-  const group = s.groupA ? 'pair' : 'impair'
+  const group = s.inGroupEven ? 'pair' : 'impair'
   return `${s.fullName} (groupe ${group})`
 }
 
@@ -67,11 +67,11 @@ export function ExerciseCard (props: Props): JSX.Element {
     status = 'presented'
   }
 
-  if (props.correctedInEvenGroup || props.correctedInOddGroup) {
+  if (props.teacherCorrectedForGroupEven || props.teacherCorrectedForGroupOdd) {
     let group
-    if (props.correctedInEvenGroup && props.correctedInOddGroup) {
+    if (props.teacherCorrectedForGroupEven && props.teacherCorrectedForGroupOdd) {
       group = <><strong>pair</strong> et <strong>impair</strong></>
-    } else if (props.correctedInEvenGroup) {
+    } else if (props.teacherCorrectedForGroupEven) {
       group = <strong>pair</strong>
     } else {
       group = <strong>impair</strong>
@@ -221,9 +221,9 @@ export function ExerciseCard (props: Props): JSX.Element {
     dropdownButtonColor = 'primary'
   }
 
-  const correctedInMyGroup = props.studentInEvenGroup
-    ? props.correctedInEvenGroup
-    : props.correctedInOddGroup
+  const correctedInMyGroup = props.studentInGroupEven
+    ? props.teacherCorrectedForGroupEven
+    : props.teacherCorrectedForGroupOdd
 
   return (
     <div class={`exercise-card exercise-card--${status} card`}>

@@ -63,8 +63,8 @@ struct Student {
     username: String,
     #[serde(rename = "fullName")]
     full_name: String,
-    #[serde(rename = "groupA")]
-    group_a: bool,
+    #[serde(rename = "inGroupEven")]
+    in_group_even: bool,
 }
 
 pub(crate) async fn me(
@@ -77,7 +77,7 @@ pub(crate) async fn me(
 
     let db = db.lock().await;
     let mut stmt =
-        try_500!(db.prepare("SELECT id, username, full_name, group_a FROM students WHERE id = ?"));
+        try_500!(db.prepare("SELECT id, username, full_name, in_group_even FROM students WHERE id = ?"));
     let mut rows = try_500!(stmt.query(params![student_id]));
     let row = match try_500!(rows.next()) {
         Some(val) => val,
@@ -87,7 +87,7 @@ pub(crate) async fn me(
         id: try_500!(row.get(0)),
         username: try_500!(row.get(1)),
         full_name: try_500!(row.get(2)),
-        group_a: try_500!(row.get(3)),
+        in_group_even: try_500!(row.get(3)),
     };
     json(&me, StatusCode::OK)
 }
@@ -98,10 +98,10 @@ struct Unit {
     name: String,
     #[serde(rename = "exerciseCount")]
     exercise_cnt: u32,
-    #[serde(rename = "deadlineA")]
-    deadline_a: String,
-    #[serde(rename = "deadlineB")]
-    deadline_b: String,
+    #[serde(rename = "deadlineGroupEven")]
+    deadline_group_even: String,
+    #[serde(rename = "deadlineGroupOdd")]
+    deadline_group_odd: String,
 }
 
 pub(crate) async fn units(
@@ -114,7 +114,7 @@ pub(crate) async fn units(
 
     let db = db.lock().await;
     let mut stmt =
-        try_500!(db.prepare("SELECT id, name, exercise_count, deadline_a, deadline_b FROM units"));
+        try_500!(db.prepare("SELECT id, name, exercise_count, deadline_group_even, deadline_group_odd FROM units"));
     let mut rows = try_500!(stmt.query(NO_PARAMS));
     let mut result: Vec<Unit> = Vec::new();
     let mut row = try_500!(rows.next());
@@ -123,8 +123,8 @@ pub(crate) async fn units(
             id: try_500!(r.get(0)),
             name: try_500!(r.get(1)),
             exercise_cnt: try_500!(r.get(2)),
-            deadline_a: try_500!(r.get(3)),
-            deadline_b: try_500!(r.get(4)),
+            deadline_group_even: try_500!(r.get(3)),
+            deadline_group_odd: try_500!(r.get(4)),
         });
         row = try_500!(rows.next());
     }
@@ -142,14 +142,14 @@ struct Exercise {
     #[serde(rename = "blocked")]
     blocked: bool,
     /// The teacher corrected the exercise for group A
-    #[serde(rename = "correctedA")]
-    corrected_a: bool,
+    #[serde(rename = "teacherCorrectedForGroupEven")]
+    teacher_corrected_for_group_even: bool,
     /// The teacher corrected the exercise for group B
-    #[serde(rename = "correctedB")]
-    corrected_b: bool,
+    #[serde(rename = "teacherCorrectedForGroupOdd")]
+    teacher_corrected_for_group_odd: bool,
     /// A list of digests for the pictures with the correction.
-    #[serde(rename = "correctionDigests")]
-    correction_digests: Vec<String>,
+    #[serde(rename = "correctionImages")]
+    correction_images: Vec<String>,
 }
 
 pub(crate) async fn unit_exercises(
@@ -176,7 +176,7 @@ pub(crate) async fn unit_exercises(
     let mut result: Vec<Exercise> = Vec::new();
     result.resize_with(try_500!(usize::try_from(exercise_count)), Default::default);
 
-    let mut stmt = try_500!(db.prepare("SELECT student_id, exercise, state, username, full_name, group_a FROM exercise_student_state INNER JOIN students ON exercise_student_state.student_id = students.id WHERE unit_id = ?"));
+    let mut stmt = try_500!(db.prepare("SELECT student_id, exercise, state, username, full_name, in_group_even FROM exercise_student_state INNER JOIN students ON exercise_student_state.student_id = students.id WHERE unit_id = ?"));
     let mut rows = try_500!(stmt.query(params![unit_id]));
     let mut row = try_500!(rows.next());
     while let Some(r) = row {
@@ -185,7 +185,7 @@ pub(crate) async fn unit_exercises(
         let state: u32 = try_500!(r.get(2));
         let student_username: String = try_500!(r.get(3));
         let student_full_name: String = try_500!(r.get(4));
-        let student_group_a: bool = try_500!(r.get(5));
+        let student_in_group_even: bool = try_500!(r.get(5));
         let exercise = match result.get_mut(try_500!(usize::try_from(exercise_idx))) {
             Some(val) => val,
             None => panic!("Exercise index out of bounds: {}", exercise_idx),
@@ -199,12 +199,12 @@ pub(crate) async fn unit_exercises(
             id: student_id,
             username: student_username,
             full_name: student_full_name,
-            group_a: student_group_a,
+            in_group_even: student_in_group_even,
         });
         row = try_500!(rows.next());
     }
 
-    let mut stmt = try_500!(db.prepare("SELECT index_, blocked, corrected_a, corrected_b FROM exercise_teacher_override WHERE unit_id = ?"));
+    let mut stmt = try_500!(db.prepare("SELECT index_, blocked, teacher_corrected_for_group_even, teacher_corrected_for_group_odd FROM exercise WHERE unit_id = ?"));
     let mut rows = try_500!(stmt.query(params![unit_id]));
     let mut row = try_500!(rows.next());
     while let Some(r) = row {
@@ -214,8 +214,8 @@ pub(crate) async fn unit_exercises(
             None => panic!("Exercise index out of bounds: {}", exercise_idx),
         };
         exercise.blocked = try_500!(r.get(1));
-        exercise.corrected_a = try_500!(r.get(2));
-        exercise.corrected_b = try_500!(r.get(3));
+        exercise.teacher_corrected_for_group_even = try_500!(r.get(2));
+        exercise.teacher_corrected_for_group_odd = try_500!(r.get(3));
         row = try_500!(rows.next());
     }
 
@@ -231,7 +231,7 @@ pub(crate) async fn unit_exercises(
             Some(val) => val,
             None => panic!("Exercise index out of bounds: {}", exercise_idx),
         };
-        exercise.correction_digests.push(digest);
+        exercise.correction_images.push(digest);
         row = try_500!(rows.next());
     }
 
@@ -325,7 +325,7 @@ pub(crate) async fn mark_exercise_blocked(
         return empty(StatusCode::NOT_FOUND);
     }
 
-    let mut stmt = try_500!(db.prepare("INSERT INTO exercise_teacher_override (unit_id, index_, blocked) VALUES (?, ?, ?) ON CONFLICT (unit_id, index_) DO UPDATE SET blocked = ?"));
+    let mut stmt = try_500!(db.prepare("INSERT INTO exercise (unit_id, index_, blocked) VALUES (?, ?, ?) ON CONFLICT (unit_id, index_) DO UPDATE SET blocked = ?"));
     try_500!(stmt.execute(params![unit_id, exercise, blocked, blocked]));
 
     empty(StatusCode::OK)
@@ -346,8 +346,8 @@ pub(crate) async fn mark_exercise_corrected(
 
     let db = db.lock().await;
 
-    let group_a: bool = {
-        let mut stmt = try_500!(db.prepare("SELECT group_a FROM students WHERE id = ?"));
+    let in_group_even: bool = {
+        let mut stmt = try_500!(db.prepare("SELECT in_group_even FROM students WHERE id = ?"));
         let mut rows = try_500!(stmt.query(params![student_id]));
         let row = match try_500!(rows.next()) {
             Some(val) => val,
@@ -370,12 +370,12 @@ pub(crate) async fn mark_exercise_corrected(
         return empty(StatusCode::NOT_FOUND);
     }
 
-    let field = if group_a {
-        "corrected_a"
+    let field = if in_group_even {
+        "teacher_corrected_for_group_even"
     } else {
-        "corrected_b"
+        "teacher_corrected_for_group_odd"
     };
-    let query = format!("INSERT INTO exercise_teacher_override (unit_id, index_, {}) VALUES (?, ?, ?) ON CONFLICT (unit_id, index_) DO UPDATE SET {} = ?", field, field);
+    let query = format!("INSERT INTO exercise (unit_id, index_, {}) VALUES (?, ?, ?) ON CONFLICT (unit_id, index_) DO UPDATE SET {} = ?", field, field);
     let mut stmt = try_500!(db.prepare(&query));
     try_500!(stmt.execute(params![unit_id, exercise, corrected, corrected]));
 

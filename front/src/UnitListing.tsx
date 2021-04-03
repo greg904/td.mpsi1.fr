@@ -9,12 +9,12 @@ export interface Props {
   units: net.Unit[]
 
   // Whether or not we are in group A.
-  studentInEvenGroup: boolean
+  sstudentInGroupEven: boolean
 }
 
 export function UnitListing (props: Props): JSX.Element {
   const deadlines = props.units.map(u => {
-    const deadline = props.studentInEvenGroup ? u.deadlineA : u.deadlineB
+    const deadline = props.sstudentInGroupEven ? u.deadlineGroupEven : u.deadlineGroupOdd
     return deadline
   })
 

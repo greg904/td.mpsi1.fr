@@ -62,7 +62,7 @@ export interface Student {
   id: number
   username: string
   fullName: string
-  groupA: boolean
+  inGroupEven: boolean
 }
 
 function isValidStudent (o: any): o is Student {
@@ -70,7 +70,7 @@ function isValidStudent (o: any): o is Student {
     typeof o.id === 'number' && Number.isSafeInteger(o.id) && o.id >= 0 &&
     typeof o.username === 'string' &&
     typeof o.fullName === 'string' &&
-    typeof o.groupA === 'boolean'
+    typeof o.inGroupEven === 'boolean'
 }
 
 export async function fetchStudentData (authToken: string): Promise<Student> {
@@ -106,11 +106,11 @@ export interface Unit {
   // The count of exercises for this unit.
   exerciseCount: number
 
-  // The date of the correction day for group A.
-  deadlineA: Date
+  // The date of the correction day for the even group.
+  deadlineGroupEven: Date
 
-  // The date of the correction day for group B.
-  deadlineB: Date
+  // The date of the correction day for the odd group.
+  deadlineGroupOdd: Date
 }
 
 function parseDeadline (str: string): Date {
@@ -126,16 +126,16 @@ function parseUnit (o: any): Unit {
     typeof o.id !== 'number' || !Number.isSafeInteger(o.id) || o.id < 0 ||
     typeof o.name !== 'string' ||
     typeof o.exerciseCount !== 'number' || !Number.isSafeInteger(o.exerciseCount) || o.exerciseCount < 0 ||
-    typeof o.deadlineA !== 'string' ||
-    typeof o.deadlineB !== 'string') {
+    typeof o.deadlineGroupEven !== 'string' ||
+    typeof o.deadlineGroupOdd !== 'string') {
     throw new Error('Invalid JSON object')
   }
   return {
     id: o.id,
     name: o.name,
     exerciseCount: o.exerciseCount,
-    deadlineA: parseDeadline(o.deadlineA),
-    deadlineB: parseDeadline(o.deadlineB)
+    deadlineGroupEven: parseDeadline(o.deadlineGroupEven),
+    deadlineGroupOdd: parseDeadline(o.deadlineGroupOdd)
   }
 }
 
@@ -172,15 +172,15 @@ export interface Exercise {
   // Whether or not this exercise should not be done for some reason.
   blocked: boolean
 
-  // Whether or not this exercise was corrected for group A.
-  correctedA: boolean
+  // Whether or not this exercise was corrected for the even group.
+  teacherCorrectedForGroupEven: boolean
 
-  // Whether or not this exercise was corrected for group B.
-  correctedB: boolean
+  // Whether or not this exercise was corrected for the odd group.
+  teacherCorrectedForGroupOdd: boolean
 
   // A list of digests for the pictures with the correction for that
   // exercise.
-  correctionDigests: string[]
+  correctionImages: string[]
 }
 
 function isValidExercise (o: any): o is Exercise {
@@ -188,9 +188,9 @@ function isValidExercise (o: any): o is Exercise {
     Array.isArray(o.reservedBy) && o.reservedBy.every(isValidStudent) &&
     Array.isArray(o.presentedBy) && o.presentedBy.every(isValidStudent) &&
     typeof o.blocked === 'boolean' &&
-    typeof o.correctedA === 'boolean' &&
-    typeof o.correctedB === 'boolean' &&
-    Array.isArray(o.correctionDigests) && o.correctionDigests.every((d: any) => typeof d === 'string')
+    typeof o.teacherCorrectedForGroupEven === 'boolean' &&
+    typeof o.teacherCorrectedForGroupOdd === 'boolean' &&
+    Array.isArray(o.correctionImages) && o.correctionImages.every((d: any) => typeof d === 'string')
 }
 
 export async function fetchExercisesInUnit (authToken: string, unitId: number): Promise<Exercise[]> {
@@ -210,7 +210,7 @@ export async function fetchExercisesInUnit (authToken: string, unitId: number): 
 
   const json = await res.json()
   if (!Array.isArray(json) || !json.every(isValidExercise)) {
-    throw new Error('Response body is not an array')
+    throw new Error('Response body is not a valid array.')
   }
 
   return json
