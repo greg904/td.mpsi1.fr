@@ -130,7 +130,7 @@ export function UnitDetails (props: UnitDetailsProps): JSX.Element {
           </button>
           <Link
             className='btn btn-secondary mb-1 me-1'
-            to={`/chapitres/${props.unitId}/exercices/${i}/ajouter-correction`}
+            to={`/chapitres/${props.unitId}/exercices/${i + 1}/corrections/ajouter`}
           >
             Ajouter une photo de correction
           </Link>

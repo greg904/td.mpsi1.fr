@@ -6,9 +6,27 @@ export class InvalidAuthTokenError extends Error {
   }
 }
 
-export class ResponseNotOkError extends Error {
+export class FailureErrorCode extends Error {
   constructor () {
     super('Response is not OK.')
+  }
+}
+
+export class BadRequestError extends Error {
+  constructor () {
+    super('Bad request.')
+  }
+}
+
+export class PayloadTooLargeError extends Error {
+  constructor () {
+    super('The payload is too large.')
+  }
+}
+
+export class ConflictError extends Error {
+  constructor () {
+    super('The entity already exists.')
   }
 }
 
@@ -29,7 +47,7 @@ export async function logIn (username: string, password: string): Promise<string
   }
 
   if (!res.ok) {
-    throw new ResponseNotOkError()
+    throw new FailureErrorCode()
   }
 
   const json = await res.json()
@@ -67,7 +85,7 @@ export async function fetchStudentData (authToken: string): Promise<Student> {
   }
 
   if (!res.ok) {
-    throw new ResponseNotOkError()
+    throw new FailureErrorCode()
   }
 
   const json = await res.json()
@@ -133,7 +151,7 @@ export async function fetchUnits (authToken: string): Promise<Unit[]> {
   }
 
   if (!res.ok) {
-    throw new ResponseNotOkError()
+    throw new FailureErrorCode()
   }
 
   const json = await res.json()
@@ -187,7 +205,7 @@ export async function fetchExercisesInUnit (authToken: string, unitId: number): 
   }
 
   if (!res.ok) {
-    throw new ResponseNotOkError()
+    throw new FailureErrorCode()
   }
 
   const json = await res.json()
@@ -213,7 +231,7 @@ export async function modifyExercise (authToken: string, unitId: number, exercis
   }
 
   if (!res.ok) {
-    throw new ResponseNotOkError()
+    throw new FailureErrorCode()
   }
 }
 
@@ -226,12 +244,19 @@ export async function submitExerciseCorrection (authToken: string, unitId: numbe
     body: file
   })
 
-  if (res.status === 401) {
-    throw new InvalidAuthTokenError()
+  switch (res.status) {
+    case 400:
+      throw new BadRequestError()
+    case 401:
+      throw new InvalidAuthTokenError()
+    case 409:
+      throw new ConflictError()
+    case 413:
+      throw new PayloadTooLargeError()
   }
 
   if (!res.ok) {
-    throw new ResponseNotOkError()
+    throw new FailureErrorCode()
   }
 }
 
@@ -240,7 +265,7 @@ export async function deleteExerciseCorrection (authToken: string, unitId: numbe
     method: 'DELETE',
     headers: {
       Authorization: `Bearer ${authToken}`
-    },
+    }
   })
 
   if (res.status === 401) {
@@ -248,6 +273,6 @@ export async function deleteExerciseCorrection (authToken: string, unitId: numbe
   }
 
   if (!res.ok) {
-    throw new ResponseNotOkError()
+    throw new FailureErrorCode()
   }
 }

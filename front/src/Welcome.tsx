@@ -1,18 +1,29 @@
-import { h, JSX } from 'preact'
-
-import * as net from './net'
+import { JSX } from 'preact'
 
 export interface WelcomeProps {
-  student: net.Student
+  studentFullName: string
+  studentIsEvenGroup: boolean
+  onClickDisconnect?: () => void
 }
 
 export function Welcome (props: WelcomeProps): JSX.Element {
-  const groupName = props.student.groupA ? 'pair' : 'impair'
+  const groupName = props.studentIsEvenGroup ? 'pair' : 'impair'
 
   return (
-    <p>
-      Bonjour <strong>{props.student.fullName}</strong>.<br />
-      Vous êtes dans le groupe <strong>{groupName}</strong>.
-    </p>
+    <>
+      <p>
+        Bonjour <strong>{props.studentFullName}</strong>.<br />
+        Vous êtes dans le groupe <strong>{groupName}</strong>.<br />
+      </p>
+      <button
+        type='button'
+        class='btn btn-outline-danger btn-sm mb-4'
+        onClick={() => {
+          if (props.onClickDisconnect !== undefined) { props.onClickDisconnect() }
+        }}
+      >
+        Se déconnecter
+      </button>
+    </>
   )
 }

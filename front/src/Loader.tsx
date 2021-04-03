@@ -1,8 +1,15 @@
-import { h, JSX } from 'preact'
+import { JSX } from 'preact'
 
-export default function Loader (): JSX.Element {
+export interface LoaderProps {
+  small?: boolean
+}
+
+export default function Loader (props: LoaderProps): JSX.Element {
+  let className = 'spinner-border'
+  if (props.small !== undefined && props.small) { className += ' spinner-border-sm' }
+
   return (
-    <div class='spinner-border' role='status'>
+    <div class={className} role='status'>
       <span class='visually-hidden'>Chargement...</span>
     </div>
   )

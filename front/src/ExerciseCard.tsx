@@ -8,7 +8,7 @@ export interface Props {
   exercise: net.Exercise
   exerciseIndex: number
   children: ComponentChildren
-  onClickCorrectionPictureDelete?(digest: string): void
+  onClickCorrectionPictureDelete?: (digest: string) => void
 }
 
 function renderStudentInline (s: net.Student): JSX.Element {
@@ -53,8 +53,7 @@ export function ExerciseCard (props: Props): JSX.Element {
               src={`${config.correctionsEndpoint}${d}.png`}
               alt='Correction exercice'
               onClickDelete={() => {
-                if (props.onClickCorrectionPictureDelete !== undefined)
-                  props.onClickCorrectionPictureDelete(d)
+                if (props.onClickCorrectionPictureDelete !== undefined) { props.onClickCorrectionPictureDelete(d) }
               }}
             />
           )

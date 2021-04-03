@@ -1,5 +1,6 @@
-import { h, JSX } from 'preact'
+import { JSX } from 'preact'
 import { useState } from 'preact/hooks'
+import Loader from './Loader'
 
 import * as net from './net'
 
@@ -17,15 +18,6 @@ export function LogInForm (props: LogInFormProps): JSX.Element {
   const [loading, setLoading] = useState(false)
   const [alert, setAlert] = useState<Alert>(Alert.None)
   const [wasValidated, setWasValidated] = useState<boolean>(false)
-
-  let loader = null
-  if (loading) {
-    loader = (
-      <div class='spinner-border' role='status'>
-        <span class='visually-hidden'>Chargement...</span>
-      </div>
-    )
-  }
 
   let alertDiv = null
   if (alert !== Alert.None) {
@@ -100,7 +92,7 @@ export function LogInForm (props: LogInFormProps): JSX.Element {
       <div class={loading ? 'mb-3' : ''}>
         <button type='submit' class='btn btn-primary' disabled={loading}>Se connecter</button>
       </div>
-      {loader}
+      {loading ? <Loader /> : null}
     </form>
   )
 }

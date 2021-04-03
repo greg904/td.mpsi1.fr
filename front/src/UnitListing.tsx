@@ -1,4 +1,4 @@
-import { Fragment, JSX } from 'preact'
+import { JSX } from 'preact'
 
 import { UnitCard } from './UnitCard'
 import * as net from './net'
@@ -20,12 +20,12 @@ export function UnitListing (props: Props): JSX.Element {
   const nextDeadline = Math.min(...deadlines.map(d => d.valueOf())
     .filter(d => {
       // The deadline is at the end of the day.
-      return d + 1000 * 60 * 60 * 24 > now;
+      return d + 1000 * 60 * 60 * 24 > now
     }))
 
   const units = props.units.map((u, i) => {
     return (
-      <div key={i} class={'col'}>
+      <div key={i} class='col'>
         <UnitCard
           id={u.id}
           name={u.name}

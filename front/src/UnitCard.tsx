@@ -12,10 +12,12 @@ export interface Props {
 export function UnitCard (props: Props): JSX.Element {
   let badge = null
   if (props.nextBadge) {
-    badge = <>
+    badge = (
+      <>
       &nbsp;
-      <span class="badge bg-success">Prochain</span>
-    </>
+        <span class='badge bg-success'>Prochain</span>
+      </>
+    )
   }
 
   return (

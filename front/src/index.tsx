@@ -3,7 +3,7 @@ import 'bootstrap/dist/css/bootstrap.css' // Import precompiled Bootstrap css
 
 import { render, JSX } from 'preact'
 import { useState, useEffect } from 'preact/hooks'
-import { BrowserRouter, Route, Switch, useParams } from 'react-router-dom'
+import { BrowserRouter, Link, Route, Switch, useParams } from 'react-router-dom'
 
 import { LogInForm } from './LogInForm'
 import useStickyState from './use-sticky-state'
@@ -12,22 +12,64 @@ import Loader from './Loader'
 import { UnitDetails } from './UnitDetails'
 import { Welcome } from './Welcome'
 import { UnitListing } from './UnitListing'
-import { UploadCorrectionPage } from './UploadCorrectionPage'
+import { UploadCorrectionForm } from './UploadCorrectionForm'
 
 interface UnitDetailsRouteProps {
-  groupA: boolean
   authToken: string
+  units: net.Unit[]
+  studentIsEvenGroup: boolean
 }
 
 function UnitDetailsRoute (props: UnitDetailsRouteProps): JSX.Element {
-  const { unitId }: { unitId?: string } = useParams()
+  const { unitId: unitIdStr }: { unitId?: string } = useParams()
+  const unitId = parseInt(unitIdStr as string)
+
+  const unit = props.units.find(u => u.id === unitId) as net.Unit
 
   return (
-    <UnitDetails
-      unitId={parseInt(unitId as string)}
-      groupA={props.groupA}
-      authToken={props.authToken}
-    />
+    <>
+      <nav class='mb-4' aria-label='Chemin de navigation'>
+        <ol class='breadcrumb'>
+          <li class='breadcrumb-item'><Link to='/'>Accueil</Link></li>
+          <li class='breadcrumb-item active' aria-current='page'>{unit.name}</li>
+        </ol>
+      </nav>
+      <UnitDetails
+        unitId={unitId}
+        groupA={props.studentIsEvenGroup}
+        authToken={props.authToken}
+      />
+    </>
+  )
+}
+
+interface UploadCorrectionFormRouteProps {
+  authToken: string
+  units: net.Unit[]
+}
+
+function UploadCorrectionFormRoute (props: UploadCorrectionFormRouteProps): JSX.Element {
+  const { unitId: unitIdStr, exerciseIndex: exerciseIndexStr }: { unitId?: string, exerciseIndex?: string } = useParams()
+  const unitId = parseInt(unitIdStr as string)
+  const exerciseIndex = parseInt(exerciseIndexStr as string) - 1
+
+  const unit = props.units.find(u => u.id === unitId) as net.Unit
+
+  return (
+    <>
+      <nav class='mb-4' aria-label='Chemin de navigation'>
+        <ol class='breadcrumb'>
+          <li class='breadcrumb-item'><Link to='/'>Accueil</Link></li>
+          <li class='breadcrumb-item'><Link to={`/chapitres/${unitId}`}>{unit.name}</Link></li>
+          <li class='breadcrumb-item active' aria-current='page'>Ajout de la correction pour l'exercice {exerciseIndex + 1}</li>
+        </ol>
+      </nav>
+      <UploadCorrectionForm
+        authToken={props.authToken}
+        unitId={unitId}
+        exerciseIndex={exerciseIndex}
+      />
+    </>
   )
 }
 
@@ -90,15 +132,28 @@ function App (): JSX.Element {
       <Switch>
         <Route path='/chapitres/:unitId(\d+)' exact>
           <UnitDetailsRoute
-            groupA={student.groupA}
+            units={units}
+            studentIsEvenGroup={student.groupA}
             authToken={authToken}
           />
         </Route>
-        <Route path='/chapitres/:unitId(\d+)/exercices/:exerciseIndex(\d+)/ajouter-correction' exact>
-          <UploadCorrectionPage authToken={authToken} />
+        <Route path='/chapitres/:unitId(\d+)/exercices/:exerciseIndex(\d+)/corrections/ajouter' exact>
+          <UploadCorrectionFormRoute
+            authToken={authToken}
+            units={units}
+          />
         </Route>
         <Route path='/' exact>
-          <Welcome student={student} />
+          <nav class='mb-4' aria-label='Chemin de navigation'>
+            <ol class='breadcrumb'>
+              <li class='breadcrumb-item active' aria-current='page'>Accueil</li>
+            </ol>
+          </nav>
+          <Welcome
+            studentFullName={student.fullName}
+            studentIsEvenGroup={student.groupA}
+            onClickDisconnect={() => setAuthToken(null)}
+          />
           <UnitListing
             units={relevantUnits}
             groupA={student.groupA}
