@@ -590,3 +590,54 @@ pub(crate) async fn submit_exercise_correction(
 
     empty(StatusCode::OK)
 }
+
+pub(crate) async fn delete_exercise_correction(
+    req: Request<Body>,
+    unit_id: u32,
+    exercise: u32,
+    correction_digest: String,
+    db: &Mutex<Connection>,
+    config: &Config,
+) -> Response<Body> {
+    // Make sure that the user is logged in.
+    if let Err(err) = get_logged_in_user_id(&req, config) {
+        warn_for_req(
+            &req,
+            config,
+            &format!(
+                "exercise correction deletion request with invalid authentication: {:?}",
+                err
+            ),
+        );
+        return empty(StatusCode::FORBIDDEN);
+    };
+
+    let db = db.lock().await;
+    let mut stmt = match db.prepare("DELETE FROM exercise_corrections WHERE unit_id = ? AND unit_exercise = ? AND picture_digest = ?") {
+        Ok(val) => val,
+        Err(err) => {
+            warn_for_req(
+                &req,
+                config,
+                &format!(
+                    "failed to prepare exercise correction deletion statement: {:?}",
+                    err
+                ),
+            );
+            return empty(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    // If the correction entry was not found, then the statement won't return
+    // an error so we will return OK too.
+    if let Err(err) = stmt.execute(params![unit_id, exercise, correction_digest]) {
+        warn_for_req(
+            &req,
+            config,
+            &format!("failed to delete exercise correction: {:?}", err),
+        );
+        return empty(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    empty(StatusCode::OK)
+}

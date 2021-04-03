@@ -41,53 +41,79 @@ impl Globals {
         } else {
             let mut segments = req.uri().path()[1..].split('/');
             match segments.next() {
-                Some("units") => match segments.next().and_then(|s1| s1.parse::<u32>().ok()) {
-                    Some(unit_id) => match segments.next() {
-                        Some("exercises") => {
-                            match segments.next().and_then(|s4| s4.parse::<u32>().ok()) {
-                                Some(exercise) if req.method() == http::Method::POST => {
-                                    match segments.next() {
-                                        Some("state") => {
-                                            return handlers::change_exercise_state(
+                Some("units") => {
+                    if let Some(unit_id) = segments.next().and_then(|s| s.parse::<u32>().ok()) {
+                        if segments.next() == Some("exercises") {
+                            match segments.next() {
+                                Some(exercise_index_str) => {
+                                    if let Some(exercise_index) =
+                                        exercise_index_str.parse::<u32>().ok()
+                                    {
+                                        match segments.next() {
+                                            Some("state")
+                                                if req.method() == http::Method::POST
+                                                    && segments.next().is_none() =>
+                                            {
+                                                return handlers::change_exercise_state(
+                                                    req,
+                                                    unit_id,
+                                                    exercise_index,
+                                                    &self.db,
+                                                    &self.config,
+                                                )
+                                                .await
+                                            }
+                                            Some("blocked")
+                                                if req.method() == http::Method::POST
+                                                    && segments.next().is_none() =>
+                                            {
+                                                return handlers::mark_exercise_blocked(
+                                                    req,
+                                                    unit_id,
+                                                    exercise_index,
+                                                    &self.db,
+                                                    &self.config,
+                                                )
+                                                .await
+                                            }
+                                            Some("corrected")
+                                                if req.method() == http::Method::POST
+                                                    && segments.next().is_none() =>
+                                            {
+                                                return handlers::mark_exercise_corrected(
+                                                    req,
+                                                    unit_id,
+                                                    exercise_index,
+                                                    &self.db,
+                                                    &self.config,
+                                                )
+                                                .await
+                                            }
+                                            Some("corrections") => {
+                                                match segments.next() {
+                                                    Some(correction_digest)
+                                                        if req.method() == http::Method::DELETE
+                                                            && segments.next().is_none() =>
+                                                    {
+                                                        let correction_digest =
+                                                            correction_digest.to_owned();
+                                                        return handlers::delete_exercise_correction(req, unit_id, exercise_index, correction_digest, &self.db, &self.config).await;
+                                                    }
+                                                    None if req.method() == http::Method::POST => {
+                                                        return handlers::submit_exercise_correction(
                                                 req,
                                                 unit_id,
-                                                exercise,
+                                                exercise_index,
                                                 &self.db,
                                                 &self.config,
                                             )
-                                            .await
+                                            .await;
+                                                    }
+                                                    _ => {}
+                                                }
+                                            }
+                                            _ => {}
                                         }
-                                        Some("blocked") => {
-                                            return handlers::mark_exercise_blocked(
-                                                req,
-                                                unit_id,
-                                                exercise,
-                                                &self.db,
-                                                &self.config,
-                                            )
-                                            .await
-                                        }
-                                        Some("corrected") => {
-                                            return handlers::mark_exercise_corrected(
-                                                req,
-                                                unit_id,
-                                                exercise,
-                                                &self.db,
-                                                &self.config,
-                                            )
-                                            .await
-                                        }
-                                        Some("corrections") => {
-                                            return handlers::submit_exercise_correction(
-                                                req,
-                                                unit_id,
-                                                exercise,
-                                                &self.db,
-                                                &self.config,
-                                            )
-                                            .await
-                                        }
-                                        _ => {}
                                     }
                                 }
                                 None if req.method() == http::Method::GET => {
@@ -102,10 +128,8 @@ impl Globals {
                                 _ => {}
                             }
                         }
-                        _ => {}
-                    },
-                    None => {}
-                },
+                    }
+                }
                 _ => {}
             }
         }

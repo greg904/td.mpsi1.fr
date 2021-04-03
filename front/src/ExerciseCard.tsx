@@ -2,11 +2,13 @@ import { Fragment, JSX, ComponentChildren } from 'preact'
 
 import * as config from './config'
 import * as net from './net'
+import { Thumbnail } from './Thumbnail'
 
 export interface Props {
   exercise: net.Exercise
   exerciseIndex: number
   children: ComponentChildren
+  onClickCorrectionPictureDelete?(digest: string): void
 }
 
 function renderStudentInline (s: net.Student): JSX.Element {
@@ -46,10 +48,14 @@ export function ExerciseCard (props: Props): JSX.Element {
         <h6 class='mb-2 text-muted'>Correction</h6>
         {props.exercise.correctionDigests.map((d, i) => {
           return (
-            <img
+            <Thumbnail
               key={i}
               src={`${config.correctionsEndpoint}${d}.png`}
-              class='img-fluid d-block rounded mx-auto mb-2'
+              alt='Correction exercice'
+              onClickDelete={() => {
+                if (props.onClickCorrectionPictureDelete !== undefined)
+                  props.onClickCorrectionPictureDelete(d)
+              }}
             />
           )
         })}

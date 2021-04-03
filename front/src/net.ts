@@ -234,3 +234,20 @@ export async function submitExerciseCorrection (authToken: string, unitId: numbe
     throw new ResponseNotOkError()
   }
 }
+
+export async function deleteExerciseCorrection (authToken: string, unitId: number, exerciseIndex: number, pictureDigest: string): Promise<void> {
+  const res = await fetch(`${config.apiEndpoint}units/${unitId}/exercises/${exerciseIndex}/corrections/${pictureDigest}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${authToken}`
+    },
+  })
+
+  if (res.status === 401) {
+    throw new InvalidAuthTokenError()
+  }
+
+  if (!res.ok) {
+    throw new ResponseNotOkError()
+  }
+}

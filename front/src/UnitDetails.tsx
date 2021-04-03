@@ -49,6 +49,14 @@ export function UnitDetails (props: UnitDetailsProps): JSX.Element {
         <ExerciseCard
           exercise={e}
           exerciseIndex={i}
+          onClickCorrectionPictureDelete={digest => {
+            net.deleteExerciseCorrection(props.authToken, props.unitId, i, digest)
+              .then(forceUpdate)
+              .catch(err => {
+                console.error('Failed to delete exercise correction:', err)
+                setError(true)
+              })
+          }}
         >
           <button
             type='button'
