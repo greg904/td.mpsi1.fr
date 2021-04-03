@@ -11,22 +11,35 @@ export interface Props {
 }
 
 export function UnitListing (props: Props): JSX.Element {
-  const units = props.units.map((u, i) => {
-    const first = i === 0
+  const deadlines = props.units.map(u => {
+    const deadline = props.groupA ? u.deadlineA : u.deadlineB
+    return deadline
+  })
 
+  const now = new Date().valueOf()
+  const nextDeadline = Math.min(...deadlines.map(d => d.valueOf())
+    .filter(d => {
+      // The deadline is at the end of the day.
+      return d + 1000 * 60 * 60 * 24 > now;
+    }))
+
+  const units = props.units.map((u, i) => {
     return (
-      <div key={i} class={first ? undefined : 'pt-3'}>
+      <div key={i} class={'col'}>
         <UnitCard
-          unit={u}
-          groupA={props.groupA}
+          id={u.id}
+          name={u.name}
+          deadline={deadlines[i]}
+          exerciseCount={u.exerciseCount}
+          nextBadge={deadlines[i].valueOf() === nextDeadline}
         />
       </div>
     )
   })
 
   return (
-    <Fragment>
+    <div class='row row-cols-1 row-cols-lg-2 row-cols-xxl-3 g-3'>
       {units}
-    </Fragment>
+    </div>
   )
 }

@@ -1,22 +1,34 @@
 import { JSX } from 'preact'
 import { Link } from 'react-router-dom'
 
-import * as net from './net'
-
 export interface Props {
-  unit: net.Unit
-  groupA: boolean
+  id: number
+  name: string
+  exerciseCount: number
+  deadline: Date
+  nextBadge: boolean
 }
 
 export function UnitCard (props: Props): JSX.Element {
-  const deadline = props.groupA ? props.unit.deadlineA : props.unit.deadlineB
+  let badge = null
+  if (props.nextBadge) {
+    badge = <>
+      &nbsp;
+      <span class="badge bg-success">Prochain</span>
+    </>
+  }
 
   return (
-    <div class='card'>
+    <div class='card bg-light'>
       <div class='card-body'>
-        <h5 class='card-title'>{props.unit.name}</h5>
-        <h6 class='card-subtitle mb-2 text-muted'>{deadline.toLocaleDateString()}</h6>
-        <Link className='card-link' to={`/chapitres/${props.unit.id}`}>Réserver ou modifier</Link>
+        <h5 class='card-title'>{props.name}{badge}</h5>
+        <dl class='mb-2'>
+          <dt>Date de passage</dt>
+          <dd>{props.deadline.toLocaleDateString()}</dd>
+          <dt>Nombre d'exercices</dt>
+          <dd>{props.exerciseCount}</dd>
+        </dl>
+        <Link className='stretched-link' to={`/chapitres/${props.id}`}>Réserver ou modifier</Link>
       </div>
     </div>
   )

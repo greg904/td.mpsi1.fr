@@ -3,9 +3,9 @@ body {
     padding-bottom: 2rem;
 }
 
-@media (min-height: 700px) {
+@media (min-height: 900px) {
     body {
-        padding-top: 5rem;
-        padding-bottom: 5rem;
+        padding-top: 3rem;
+        padding-bottom: 3rem;
     }
 }

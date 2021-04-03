@@ -78,6 +78,13 @@ function App (): JSX.Element {
     return <Loader />
   }
 
+  const now = new Date().valueOf()
+  const relevantUnits = units.filter(u => {
+    const minDeadline = Math.min(u.deadlineA.valueOf(), u.deadlineB.valueOf())
+    // The deadline is at the end of the day.
+    return now < minDeadline + 1000 * 60 * 60 * 24
+  })
+
   return (
     <BrowserRouter>
       <Switch>
@@ -93,7 +100,7 @@ function App (): JSX.Element {
         <Route path='/' exact>
           <Welcome student={student} />
           <UnitListing
-            units={units}
+            units={relevantUnits}
             groupA={student.groupA}
           />
         </Route>
