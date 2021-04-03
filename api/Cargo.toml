@@ -1,5 +1,5 @@
 [package]
-name = "api-td-mpsi1-fr"
+name = "td-api-mpsi1-fr"
 version = "0.1.0"
 authors = []
 edition = "2018"
