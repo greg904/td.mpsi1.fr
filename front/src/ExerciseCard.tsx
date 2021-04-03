@@ -219,7 +219,7 @@ export function ExerciseCard (props: Props): JSX.Element {
   return (
     <div class={`exercise-card exercise-card--${status} card`}>
       <div class='card-body'>
-        <div class='mb-3'>
+        <div class='clearfix mb-3'>
           <h5 class='exercise-card__title card-title float-start me-3'>
             <span class='d-sm-none'>#</span>
             <span class='d-none d-sm-inline'>Exercice </span>
