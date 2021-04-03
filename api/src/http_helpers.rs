@@ -11,18 +11,6 @@ use crate::config::Config;
 
 type HmacSha256 = Hmac<Sha256>;
 
-macro_rules! r#try_500 {
-    ($expr:expr $(,)?) => {
-        match $expr {
-            Ok(val) => val,
-            Err(err) => {
-                eprintln!("Error while handling request: {:?}", err);
-                return $crate::http_helpers::empty(::http::StatusCode::INTERNAL_SERVER_ERROR);
-            }
-        }
-    };
-}
-
 macro_rules! r#try_400 {
     ($expr:expr $(,)?) => {
         match $expr {
@@ -59,7 +47,7 @@ pub(crate) fn json<T: ?Sized + Serialize>(value: &T, status: StatusCode) -> Resp
     Response::builder()
         .status(status)
         .header("Content-Type", "application/json")
-        .body(try_500!(serde_json::to_string(value)).into())
+        .body(serde_json::to_string(value).unwrap().into())
         .unwrap()
 }
 

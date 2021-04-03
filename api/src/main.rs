@@ -147,8 +147,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // For every connection, we must make a `Service` to handle all
     // incoming HTTP requests on said connection.
-    let make_svc = make_service_fn(move |conn: &AddrStream| {
-        conn.remote_addr();
+    let make_svc = make_service_fn(move |_conn: &AddrStream| {
         // This is the `Service` that will handle the connection.
         // `service_fn` is a helper to convert a function that
         // returns a Response into a `Service`.
@@ -156,15 +155,22 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let svc = service_fn(move |req| {
             let globals = globals.clone();
             async move {
-                let fut = globals.handle(req);
-                let res = match AssertUnwindSafe(fut).catch_unwind().await {
-                    Ok(res) => res,
-                    Err(err) => {
-                        eprintln!("Panic while handling request: {:?}", err);
-                        empty(StatusCode::INTERNAL_SERVER_ERROR)
+                let ip = globals.config
+                    .real_ip_header
+                    .as_ref()
+                    .and_then(|h| req.headers().get(h))
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("(unknown IP)")
+                    .to_owned();
+                let err = {
+                    let fut = globals.clone().handle(req);
+                    match AssertUnwindSafe(fut).catch_unwind().await {
+                        Ok(res) => return Ok::<_, Infallible>(res),
+                        Err(err) => err,
                     }
                 };
-                Ok::<_, Infallible>(res)
+                eprintln!("[{}] panic while handling request: {:?}", ip, err);
+                Ok::<_, Infallible>(empty(StatusCode::INTERNAL_SERVER_ERROR))
             }
         });
         future::ready(Ok::<_, Infallible>(svc))

@@ -27,20 +27,42 @@ struct LogInRequest {
 }
 
 pub(crate) async fn log_in(
-    req: Request<Body>,
+    mut req: Request<Body>,
     db: &Mutex<Connection>,
     config: &Config,
 ) -> Response<Body> {
-    let b = try_400!(hyper::body::to_bytes(req).await);
-    let r: LogInRequest = try_400!(serde_json::from_slice(&b));
+    let b = match collect_body(req.body_mut(), 1024).await {
+        Ok(val) => val,
+        Err(CollectBodyError::ReadError(err)) => {
+            warn_for_req(
+                &req,
+                config,
+                &format!("failed to read body from log in request: {:?}", err),
+            );
+            return empty(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        Err(CollectBodyError::TooLarge) => {
+            warn_for_req(&req, config, "log in request body is too large");
+            return empty(StatusCode::PAYLOAD_TOO_LARGE);
+        }
+    };
+    let r: LogInRequest = match serde_json::from_slice(&b) {
+        Ok(val) => val,
+        Err(err) => {
+            warn_for_req(&req, config, &format!("log in request is invalid: {:?}", err));
+            return empty(StatusCode::BAD_REQUEST);
+        }
+    };
+
     let db = db.lock().await;
-    let mut stmt = try_500!(db.prepare("SELECT id FROM students WHERE username = ? LIMIT 1"));
-    let mut rows = try_500!(stmt.query(params![r.username]));
-    let row = try_500!(rows.next());
+    let mut stmt = db.prepare("SELECT id FROM students WHERE username = ? LIMIT 1").unwrap();
+    let mut rows = stmt.query(params![r.username]).unwrap();
+    let row = rows.next().unwrap();
     let id: u32 = match row {
-        Some(row) => try_500!(row.get(0)),
+        Some(row) => row.get(0).unwrap(),
         None => return empty(StatusCode::UNAUTHORIZED),
     };
+
     let passwd_ok: bool = r
         .password
         .as_bytes()
@@ -49,11 +71,13 @@ pub(crate) async fn log_in(
     if !passwd_ok {
         return empty(StatusCode::UNAUTHORIZED);
     }
+
     let id_str = id.to_string();
     let mut hmac = HmacSha256::new_varkey(&config.secret).unwrap();
     hmac.update(id_str.as_bytes());
     let sig = base64::encode_config(hmac.finalize().into_bytes(), base64::URL_SAFE_NO_PAD);
     let token = format!("{}.{}", id_str, sig);
+
     json(&token, StatusCode::OK)
 }
 
@@ -72,22 +96,34 @@ pub(crate) async fn me(
     db: &Mutex<Connection>,
     config: &Config,
 ) -> Response<Body> {
-    // Accessing this resource requires authentication.
-    let student_id = try_401!(get_logged_in_user_id(&req, config));
+    let student_id = match get_logged_in_user_id(&req, config) {
+        Ok(val) => val,
+        Err(err) => {
+            warn_for_req(
+                &req,
+                config,
+                &format!(
+                    "student data request with invalid authentication: {:?}",
+                    err
+                ),
+            );
+            return empty(StatusCode::FORBIDDEN);
+        }
+    };
 
     let db = db.lock().await;
     let mut stmt =
-        try_500!(db.prepare("SELECT id, username, full_name, in_group_even FROM students WHERE id = ?"));
-    let mut rows = try_500!(stmt.query(params![student_id]));
-    let row = match try_500!(rows.next()) {
+        db.prepare("SELECT id, username, full_name, in_group_even FROM students WHERE id = ?").unwrap();
+    let mut rows = stmt.query(params![student_id]).unwrap();
+    let row = match rows.next().unwrap() {
         Some(val) => val,
         None => return empty(StatusCode::UNAUTHORIZED),
     };
     let me = Student {
-        id: try_500!(row.get(0)),
-        username: try_500!(row.get(1)),
-        full_name: try_500!(row.get(2)),
-        in_group_even: try_500!(row.get(3)),
+        id: row.get(0).unwrap(),
+        username: row.get(1).unwrap(),
+        full_name: row.get(2).unwrap(),
+        in_group_even: row.get(3).unwrap(),
     };
     json(&me, StatusCode::OK)
 }
@@ -97,7 +133,7 @@ struct Unit {
     id: u32,
     name: String,
     #[serde(rename = "exerciseCount")]
-    exercise_cnt: u32,
+    exercise_count: u32,
     #[serde(rename = "deadlineGroupEven")]
     deadline_group_even: String,
     #[serde(rename = "deadlineGroupOdd")]
@@ -109,25 +145,35 @@ pub(crate) async fn units(
     db: &Mutex<Connection>,
     config: &Config,
 ) -> Response<Body> {
-    // Accessing this resource requires authentication.
-    try_401!(get_logged_in_user_id(&req, config));
+    if let Err(err) = get_logged_in_user_id(&req, config) {
+        warn_for_req(
+            &req,
+            config,
+            &format!(
+                "list unit exercises request with invalid authentication: {:?}",
+                err
+            ),
+        );
+        return empty(StatusCode::FORBIDDEN);
+    };
 
     let db = db.lock().await;
     let mut stmt =
-        try_500!(db.prepare("SELECT id, name, exercise_count, deadline_group_even, deadline_group_odd FROM units"));
-    let mut rows = try_500!(stmt.query(NO_PARAMS));
+        db.prepare("SELECT id, name, exercise_count, deadline_group_even, deadline_group_odd FROM units").unwrap();
+    let mut rows = stmt.query(NO_PARAMS).unwrap();
     let mut result: Vec<Unit> = Vec::new();
-    let mut row = try_500!(rows.next());
+    let mut row = rows.next().unwrap();
     while let Some(r) = row {
         result.push(Unit {
-            id: try_500!(r.get(0)),
-            name: try_500!(r.get(1)),
-            exercise_cnt: try_500!(r.get(2)),
-            deadline_group_even: try_500!(r.get(3)),
-            deadline_group_odd: try_500!(r.get(4)),
+            id: r.get(0).unwrap(),
+            name: r.get(1).unwrap(),
+            exercise_count: r.get(2).unwrap(),
+            deadline_group_even: r.get(3).unwrap(),
+            deadline_group_odd: r.get(4).unwrap(),
         });
-        row = try_500!(rows.next());
+        row = rows.next().unwrap();
     }
+
     json(&result, StatusCode::OK)
 }
 
@@ -158,42 +204,51 @@ pub(crate) async fn unit_exercises(
     db: &Mutex<Connection>,
     config: &Config,
 ) -> Response<Body> {
-    // Accessing this resource requires authentication.
-    try_401!(get_logged_in_user_id(&req, config));
+    if let Err(err) = get_logged_in_user_id(&req, config) {
+        warn_for_req(
+            &req,
+            config,
+            &format!(
+                "list unit exercises request with invalid authentication: {:?}",
+                err
+            ),
+        );
+        return empty(StatusCode::FORBIDDEN);
+    };
 
     let db = db.lock().await;
+
     let exercise_count: u32 = {
-        let mut stmt =
-            try_500!(db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1"));
-        let mut rows = try_500!(stmt.query(params![unit_id]));
-        let row = match try_500!(rows.next()) {
+        let mut stmt = db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1").unwrap();
+        let mut rows = stmt.query(params![unit_id]).unwrap();
+        let row = match rows.next().unwrap() {
             Some(val) => val,
             None => return empty(StatusCode::NOT_FOUND),
         };
-        try_500!(row.get(0))
+        row.get(0).unwrap()
     };
 
     let mut result: Vec<Exercise> = Vec::new();
-    result.resize_with(try_500!(usize::try_from(exercise_count)), Default::default);
+    result.resize_with(usize::try_from(exercise_count).unwrap(), Default::default);
 
-    let mut stmt = try_500!(db.prepare("SELECT student_id, exercise, state, username, full_name, in_group_even FROM exercise_student_state INNER JOIN students ON exercise_student_state.student_id = students.id WHERE unit_id = ?"));
-    let mut rows = try_500!(stmt.query(params![unit_id]));
-    let mut row = try_500!(rows.next());
+    let mut stmt = db.prepare("SELECT student_id, exercise, state, username, full_name, in_group_even FROM exercise_student_state INNER JOIN students ON exercise_student_state.student_id = students.id WHERE unit_id = ?").unwrap();
+    let mut rows = stmt.query(params![unit_id]).unwrap();
+    let mut row = rows.next().unwrap();
     while let Some(r) = row {
-        let student_id: u32 = try_500!(r.get(0));
-        let exercise_idx: u32 = try_500!(r.get(1));
-        let state: u32 = try_500!(r.get(2));
-        let student_username: String = try_500!(r.get(3));
-        let student_full_name: String = try_500!(r.get(4));
-        let student_in_group_even: bool = try_500!(r.get(5));
-        let exercise = match result.get_mut(try_500!(usize::try_from(exercise_idx))) {
+        let student_id: u32 = r.get(0).unwrap();
+        let exercise_idx: u32 = r.get(1).unwrap();
+        let state: u32 = r.get(2).unwrap();
+        let student_username: String = r.get(3).unwrap();
+        let student_full_name: String = r.get(4).unwrap();
+        let student_in_group_even: bool = r.get(5).unwrap();
+        let exercise = match result.get_mut(usize::try_from(exercise_idx).unwrap()) {
             Some(val) => val,
             None => panic!("Exercise index out of bounds: {}", exercise_idx),
         };
         let vec = match state {
             0 => &mut exercise.reserved_by,
             1 => &mut exercise.presented_by,
-            _ => panic!("Unexpected exercise state!"),
+            _ => panic!("Unexpected exercise state: {}", state),
         };
         vec.push(Student {
             id: student_id,
@@ -201,38 +256,38 @@ pub(crate) async fn unit_exercises(
             full_name: student_full_name,
             in_group_even: student_in_group_even,
         });
-        row = try_500!(rows.next());
+        row = rows.next().unwrap();
     }
 
-    let mut stmt = try_500!(db.prepare("SELECT index_, blocked, teacher_corrected_for_group_even, teacher_corrected_for_group_odd FROM exercise WHERE unit_id = ?"));
-    let mut rows = try_500!(stmt.query(params![unit_id]));
-    let mut row = try_500!(rows.next());
+    let mut stmt = db.prepare("SELECT index_, blocked, teacher_corrected_for_group_even, teacher_corrected_for_group_odd FROM exercise WHERE unit_id = ?").unwrap();
+    let mut rows = stmt.query(params![unit_id]).unwrap();
+    let mut row = rows.next().unwrap();
     while let Some(r) = row {
-        let exercise_idx: u32 = try_500!(r.get(0));
-        let exercise = match result.get_mut(try_500!(usize::try_from(exercise_idx))) {
+        let exercise_idx: u32 = r.get(0).unwrap();
+        let exercise = match result.get_mut(usize::try_from(exercise_idx).unwrap()) {
             Some(val) => val,
             None => panic!("Exercise index out of bounds: {}", exercise_idx),
         };
-        exercise.blocked = try_500!(r.get(1));
-        exercise.teacher_corrected_for_group_even = try_500!(r.get(2));
-        exercise.teacher_corrected_for_group_odd = try_500!(r.get(3));
-        row = try_500!(rows.next());
+        exercise.blocked = r.get(1).unwrap();
+        exercise.teacher_corrected_for_group_even = r.get(2).unwrap();
+        exercise.teacher_corrected_for_group_odd = r.get(3).unwrap();
+        row = rows.next().unwrap();
     }
 
-    let mut stmt = try_500!(db.prepare(
+    let mut stmt = db.prepare(
         "SELECT unit_exercise, picture_digest FROM exercise_corrections WHERE unit_id = ?"
-    ));
-    let mut rows = try_500!(stmt.query(params![unit_id]));
-    let mut row = try_500!(rows.next());
+    ).unwrap();
+    let mut rows = stmt.query(params![unit_id]).unwrap();
+    let mut row = rows.next().unwrap();
     while let Some(r) = row {
-        let exercise_idx: u32 = try_500!(r.get(0));
-        let digest: String = try_500!(r.get(1));
-        let exercise = match result.get_mut(try_500!(usize::try_from(exercise_idx))) {
+        let exercise_idx: u32 = r.get(0).unwrap();
+        let digest: String = r.get(1).unwrap();
+        let exercise = match result.get_mut(usize::try_from(exercise_idx).unwrap()) {
             Some(val) => val,
             None => panic!("Exercise index out of bounds: {}", exercise_idx),
         };
         exercise.correction_images.push(digest);
-        row = try_500!(rows.next());
+        row = rows.next().unwrap();
     }
 
     json(&result, StatusCode::OK)
@@ -251,7 +306,7 @@ enum ExerciseStudentState {
 pub(crate) async fn change_exercise_state(
     req: Request<Body>,
     unit_id: u32,
-    exercise: u32,
+    exercise_index: u32,
     db: &Mutex<Connection>,
     config: &Config,
 ) -> Response<Body> {
@@ -265,8 +320,8 @@ pub(crate) async fn change_exercise_state(
 
     let new_state: u32 = match new_state {
         ExerciseStudentState::None => {
-            let mut stmt = try_500!(db.prepare("DELETE FROM exercise_student_state WHERE student_id = ? AND unit_id = ? AND exercise = ?"));
-            try_500!(stmt.execute(params![student_id, unit_id, exercise]));
+            let mut stmt = db.prepare("DELETE FROM exercise_student_state WHERE student_id = ? AND unit_id = ? AND exercise = ?").unwrap();
+            stmt.execute(params![student_id, unit_id, exercise_index]).unwrap();
             return empty(StatusCode::OK);
         }
         ExerciseStudentState::Reserved => 0,
@@ -275,21 +330,21 @@ pub(crate) async fn change_exercise_state(
 
     let exercise_count: u32 = {
         let mut stmt =
-            try_500!(db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1"));
-        let mut rows = try_500!(stmt.query(params![unit_id]));
-        let row = match try_500!(rows.next()) {
+            db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1").unwrap();
+        let mut rows = stmt.query(params![unit_id]).unwrap();
+        let row = match rows.next().unwrap() {
             Some(val) => val,
             None => return empty(StatusCode::NOT_FOUND),
         };
-        try_500!(row.get(0))
+        row.get(0).unwrap()
     };
-    if exercise >= exercise_count {
+    if exercise_index >= exercise_count {
         return empty(StatusCode::NOT_FOUND);
     }
 
-    let mut stmt = try_500!(db.prepare("INSERT OR REPLACE INTO exercise_student_state (student_id, unit_id, exercise, state) VALUES (?, ?, ?, ?)"));
-    let updated_cnt = try_500!(stmt.execute(params![student_id, unit_id, exercise, new_state]));
-    if updated_cnt == 0 {
+    let mut stmt = db.prepare("INSERT OR REPLACE INTO exercise_student_state (student_id, unit_id, exercise, state) VALUES (?, ?, ?, ?)").unwrap();
+    let updated_count = stmt.execute(params![student_id, unit_id, exercise_index, new_state]).unwrap();
+    if updated_count == 0 {
         return empty(StatusCode::NOT_FOUND);
     }
 
@@ -313,20 +368,20 @@ pub(crate) async fn mark_exercise_blocked(
 
     let exercise_count: u32 = {
         let mut stmt =
-            try_500!(db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1"));
-        let mut rows = try_500!(stmt.query(params![unit_id]));
-        let row = match try_500!(rows.next()) {
+            db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1").unwrap();
+        let mut rows = stmt.query(params![unit_id]).unwrap();
+        let row = match rows.next().unwrap() {
             Some(val) => val,
             None => return empty(StatusCode::NOT_FOUND),
         };
-        try_500!(row.get(0))
+        row.get(0).unwrap()
     };
     if exercise >= exercise_count {
         return empty(StatusCode::NOT_FOUND);
     }
 
-    let mut stmt = try_500!(db.prepare("INSERT INTO exercise (unit_id, index_, blocked) VALUES (?, ?, ?) ON CONFLICT (unit_id, index_) DO UPDATE SET blocked = ?"));
-    try_500!(stmt.execute(params![unit_id, exercise, blocked, blocked]));
+    let mut stmt = db.prepare("INSERT INTO exercise (unit_id, index_, blocked) VALUES (?, ?, ?) ON CONFLICT (unit_id, index_) DO UPDATE SET blocked = ?").unwrap();
+    stmt.execute(params![unit_id, exercise, blocked, blocked]).unwrap();
 
     empty(StatusCode::OK)
 }
@@ -334,7 +389,7 @@ pub(crate) async fn mark_exercise_blocked(
 pub(crate) async fn mark_exercise_corrected(
     req: Request<Body>,
     unit_id: u32,
-    exercise: u32,
+    exercise_index: u32,
     db: &Mutex<Connection>,
     config: &Config,
 ) -> Response<Body> {
@@ -347,26 +402,26 @@ pub(crate) async fn mark_exercise_corrected(
     let db = db.lock().await;
 
     let in_group_even: bool = {
-        let mut stmt = try_500!(db.prepare("SELECT in_group_even FROM students WHERE id = ?"));
-        let mut rows = try_500!(stmt.query(params![student_id]));
-        let row = match try_500!(rows.next()) {
+        let mut stmt = db.prepare("SELECT in_group_even FROM students WHERE id = ?").unwrap();
+        let mut rows = stmt.query(params![student_id]).unwrap();
+        let row = match rows.next().unwrap() {
             Some(val) => val,
             None => return empty(StatusCode::UNAUTHORIZED),
         };
-        try_500!(row.get(0))
+        row.get(0).unwrap()
     };
 
     let exercise_count: u32 = {
         let mut stmt =
-            try_500!(db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1"));
-        let mut rows = try_500!(stmt.query(params![unit_id]));
-        let row = match try_500!(rows.next()) {
+            db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1").unwrap();
+        let mut rows = stmt.query(params![unit_id]).unwrap();
+        let row = match rows.next().unwrap() {
             Some(val) => val,
             None => return empty(StatusCode::NOT_FOUND),
         };
-        try_500!(row.get(0))
+        row.get(0).unwrap()
     };
-    if exercise >= exercise_count {
+    if exercise_index >= exercise_count {
         return empty(StatusCode::NOT_FOUND);
     }
 
@@ -376,8 +431,8 @@ pub(crate) async fn mark_exercise_corrected(
         "teacher_corrected_for_group_odd"
     };
     let query = format!("INSERT INTO exercise (unit_id, index_, {}) VALUES (?, ?, ?) ON CONFLICT (unit_id, index_) DO UPDATE SET {} = ?", field, field);
-    let mut stmt = try_500!(db.prepare(&query));
-    try_500!(stmt.execute(params![unit_id, exercise, corrected, corrected]));
+    let mut stmt = db.prepare(&query).unwrap();
+    stmt.execute(params![unit_id, exercise_index, corrected, corrected]).unwrap();
 
     empty(StatusCode::OK)
 }
@@ -385,11 +440,11 @@ pub(crate) async fn mark_exercise_corrected(
 pub(crate) async fn submit_exercise_correction(
     mut req: Request<Body>,
     unit_id: u32,
-    exercise: u32,
+    exercise_index: u32,
     db: &Mutex<Connection>,
     config: &Config,
 ) -> Response<Body> {
-    let user_id = match get_logged_in_user_id(&req, config) {
+    let student_id = match get_logged_in_user_id(&req, config) {
         Ok(val) => val,
         Err(err) => {
             warn_for_req(
@@ -423,13 +478,13 @@ pub(crate) async fn submit_exercise_correction(
         };
         row.get(0).unwrap()
     };
-    if exercise >= exercise_count {
+    if exercise_index >= exercise_count {
         warn_for_req(
             &req,
             config,
             &format!(
                 "correction submission for non existing exercise {} in unit {}",
-                exercise, unit_id
+                exercise_index, unit_id
             ),
         );
         return empty(StatusCode::NOT_FOUND);
@@ -529,7 +584,7 @@ pub(crate) async fn submit_exercise_correction(
         let mut stmt = db.prepare(
             "INSERT INTO exercise_corrections (unit_id, unit_exercise, created_by, picture_digest) VALUES (?, ?, ?, ?)"
         ).unwrap();
-        if let Err(err) = stmt.execute(params![unit_id, exercise, user_id, digest_base64]) {
+        if let Err(err) = stmt.execute(params![unit_id, exercise_index, student_id, digest_base64]) {
             match err {
                 SqliteError::SqliteFailure(
                     rusqlite::ffi::Error {
@@ -594,7 +649,7 @@ pub(crate) async fn submit_exercise_correction(
 pub(crate) async fn delete_exercise_correction(
     req: Request<Body>,
     unit_id: u32,
-    exercise: u32,
+    exercise_index: u32,
     correction_digest: String,
     db: &Mutex<Connection>,
     config: &Config,
@@ -630,7 +685,7 @@ pub(crate) async fn delete_exercise_correction(
 
     // If the correction entry was not found, then the statement won't return
     // an error so we will return OK too.
-    if let Err(err) = stmt.execute(params![unit_id, exercise, correction_digest]) {
+    if let Err(err) = stmt.execute(params![unit_id, exercise_index, correction_digest]) {
         warn_for_req(
             &req,
             config,
