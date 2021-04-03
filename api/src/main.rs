@@ -73,7 +73,16 @@ impl Globals {
                                                     _ => {}
                                                 }
                                             }
-                                            None if req.method() == http::Method::PATCH => return handlers::patch_exercise(req, unit_id, exercise_index, &self.db, &self.config).await,
+                                            None if req.method() == http::Method::PATCH => {
+                                                return handlers::patch_exercise(
+                                                    req,
+                                                    unit_id,
+                                                    exercise_index,
+                                                    &self.db,
+                                                    &self.config,
+                                                )
+                                                .await
+                                            }
                                             _ => {}
                                         }
                                     }
@@ -117,7 +126,8 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let svc = service_fn(move |req| {
             let globals = globals.clone();
             async move {
-                let ip = globals.config
+                let ip = globals
+                    .config
                     .real_ip_header
                     .as_ref()
                     .and_then(|h| req.headers().get(h))

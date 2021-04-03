@@ -46,16 +46,23 @@ pub(crate) async fn log_in(
             return empty(StatusCode::PAYLOAD_TOO_LARGE);
         }
     };
+
     let r: LogInRequest = match serde_json::from_slice(&b) {
         Ok(val) => val,
         Err(err) => {
-            warn_for_req(&req, config, &format!("log in request is invalid: {:?}", err));
+            warn_for_req(
+                &req,
+                config,
+                &format!("log in request is invalid: {:?}", err),
+            );
             return empty(StatusCode::BAD_REQUEST);
         }
     };
 
     let db = db.lock().await;
-    let mut stmt = db.prepare("SELECT id FROM students WHERE username = ? LIMIT 1").unwrap();
+    let mut stmt = db
+        .prepare("SELECT id FROM students WHERE username = ? LIMIT 1")
+        .unwrap();
     let mut rows = stmt.query(params![r.username]).unwrap();
     let row = rows.next().unwrap();
     let id: u32 = match row {
@@ -112,19 +119,22 @@ pub(crate) async fn me(
     };
 
     let db = db.lock().await;
-    let mut stmt =
-        db.prepare("SELECT id, username, full_name, in_group_even FROM students WHERE id = ?").unwrap();
+    let mut stmt = db
+        .prepare("SELECT id, username, full_name, in_group_even FROM students WHERE id = ?")
+        .unwrap();
     let mut rows = stmt.query(params![student_id]).unwrap();
     let row = match rows.next().unwrap() {
         Some(val) => val,
         None => return empty(StatusCode::UNAUTHORIZED),
     };
+
     let me = Student {
         id: row.get(0).unwrap(),
         username: row.get(1).unwrap(),
         full_name: row.get(2).unwrap(),
         in_group_even: row.get(3).unwrap(),
     };
+
     json(&me, StatusCode::OK)
 }
 
@@ -157,11 +167,15 @@ pub(crate) async fn units(
         return empty(StatusCode::FORBIDDEN);
     };
 
-    let db = db.lock().await;
-    let mut stmt =
-        db.prepare("SELECT id, name, exercise_count, deadline_group_even, deadline_group_odd FROM units").unwrap();
-    let mut rows = stmt.query(NO_PARAMS).unwrap();
     let mut result: Vec<Unit> = Vec::new();
+
+    let db = db.lock().await;
+    let mut stmt = db
+        .prepare(
+            "SELECT id, name, exercise_count, deadline_group_even, deadline_group_odd FROM units",
+        )
+        .unwrap();
+    let mut rows = stmt.query(NO_PARAMS).unwrap();
     let mut row = rows.next().unwrap();
     while let Some(r) = row {
         result.push(Unit {
@@ -219,7 +233,9 @@ pub(crate) async fn unit_exercises(
     let db = db.lock().await;
 
     let exercise_count: u32 = {
-        let mut stmt = db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1").unwrap();
+        let mut stmt = db
+            .prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1")
+            .unwrap();
         let mut rows = stmt.query(params![unit_id]).unwrap();
         let row = match rows.next().unwrap() {
             Some(val) => val,
@@ -231,7 +247,7 @@ pub(crate) async fn unit_exercises(
     let mut result: Vec<Exercise> = Vec::new();
     result.resize_with(usize::try_from(exercise_count).unwrap(), Default::default);
 
-    let mut stmt = db.prepare("SELECT student_id, exercise, state, username, full_name, in_group_even FROM exercise_student_state INNER JOIN students ON exercise_student_state.student_id = students.id WHERE unit_id = ?").unwrap();
+    let mut stmt = db.prepare("SELECT student_id, exercise_index, state, username, full_name, in_group_even FROM exercise_student_state INNER JOIN students ON exercise_student_state.student_id = students.id WHERE unit_id = ?").unwrap();
     let mut rows = stmt.query(params![unit_id]).unwrap();
     let mut row = rows.next().unwrap();
     while let Some(r) = row {
@@ -274,9 +290,9 @@ pub(crate) async fn unit_exercises(
         row = rows.next().unwrap();
     }
 
-    let mut stmt = db.prepare(
-        "SELECT unit_exercise, picture_digest FROM exercise_corrections WHERE unit_id = ?"
-    ).unwrap();
+    let mut stmt = db
+        .prepare("SELECT unit_exercise, picture_digest FROM exercise_corrections WHERE unit_id = ?")
+        .unwrap();
     let mut rows = stmt.query(params![unit_id]).unwrap();
     let mut row = rows.next().unwrap();
     while let Some(r) = row {
@@ -352,7 +368,11 @@ pub(crate) async fn patch_exercise(
     let r: PatchExerciseRequest = match serde_json::from_slice(&b) {
         Ok(val) => val,
         Err(err) => {
-            warn_for_req(&req, config, &format!("log in request is invalid: {:?}", err));
+            warn_for_req(
+                &req,
+                config,
+                &format!("log in request is invalid: {:?}", err),
+            );
             return empty(StatusCode::BAD_REQUEST);
         }
     };
@@ -360,8 +380,9 @@ pub(crate) async fn patch_exercise(
     let db = db.lock().await;
 
     let exercise_count: u32 = {
-        let mut stmt =
-            db.prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1").unwrap();
+        let mut stmt = db
+            .prepare("SELECT exercise_count FROM units WHERE id = ? LIMIT 1")
+            .unwrap();
         let mut rows = stmt.query(params![unit_id]).unwrap();
         let row = match rows.next().unwrap() {
             Some(val) => val,
@@ -376,26 +397,31 @@ pub(crate) async fn patch_exercise(
     if let Some(my_state) = r.state_for_me {
         let my_state: u32 = match my_state {
             ExerciseStudentState::None => {
-                let mut stmt = db.prepare("DELETE FROM exercise_student_state WHERE student_id = ? AND unit_id = ? AND exercise = ?").unwrap();
-                stmt.execute(params![student_id, unit_id, exercise_index]).unwrap();
+                let mut stmt = db.prepare("DELETE FROM exercise_student_state WHERE student_id = ? AND unit_id = ? AND exercise_index = ?").unwrap();
+                stmt.execute(params![student_id, unit_id, exercise_index])
+                    .unwrap();
                 return empty(StatusCode::OK);
             }
             ExerciseStudentState::Reserved => 0,
             ExerciseStudentState::Presented => 1,
         };
 
-        let mut stmt = db.prepare("INSERT OR REPLACE INTO exercise_student_state (student_id, unit_id, exercise, state) VALUES (?, ?, ?, ?)").unwrap();
-        stmt.execute(params![student_id, unit_id, exercise_index, my_state]).unwrap();
+        let mut stmt = db.prepare("INSERT OR REPLACE INTO exercise_student_state (student_id, unit_id, exercise_index, state) VALUES (?, ?, ?, ?)").unwrap();
+        stmt.execute(params![student_id, unit_id, exercise_index, my_state])
+            .unwrap();
     }
 
     if let Some(blocked) = r.blocked {
         let mut stmt = db.prepare("INSERT INTO exercise (unit_id, index_, blocked) VALUES (?, ?, ?) ON CONFLICT (unit_id, index_) DO UPDATE SET blocked = ?").unwrap();
-        stmt.execute(params![unit_id, exercise_index, blocked, blocked]).unwrap();
+        stmt.execute(params![unit_id, exercise_index, blocked, blocked])
+            .unwrap();
     }
 
     if let Some(teacher_corrected_for_my_group) = r.teacher_corrected_for_my_group {
         let in_group_even: bool = {
-            let mut stmt = db.prepare("SELECT in_group_even FROM students WHERE id = ?").unwrap();
+            let mut stmt = db
+                .prepare("SELECT in_group_even FROM students WHERE id = ?")
+                .unwrap();
             let mut rows = stmt.query(params![student_id]).unwrap();
             let row = match rows.next().unwrap() {
                 Some(val) => val,
@@ -411,7 +437,13 @@ pub(crate) async fn patch_exercise(
         };
         let query = format!("INSERT INTO exercise (unit_id, index_, {0}) VALUES (?, ?, ?) ON CONFLICT (unit_id, index_) DO UPDATE SET {0} = ?", field);
         let mut stmt = db.prepare(&query).unwrap();
-        stmt.execute(params![unit_id, exercise_index, teacher_corrected_for_my_group, teacher_corrected_for_my_group]).unwrap();
+        stmt.execute(params![
+            unit_id,
+            exercise_index,
+            teacher_corrected_for_my_group,
+            teacher_corrected_for_my_group
+        ])
+        .unwrap();
     }
 
     empty(StatusCode::OK)
@@ -564,7 +596,8 @@ pub(crate) async fn submit_exercise_correction(
         let mut stmt = db.prepare(
             "INSERT INTO exercise_corrections (unit_id, unit_exercise, created_by, picture_digest) VALUES (?, ?, ?, ?)"
         ).unwrap();
-        if let Err(err) = stmt.execute(params![unit_id, exercise_index, student_id, digest_base64]) {
+        if let Err(err) = stmt.execute(params![unit_id, exercise_index, student_id, digest_base64])
+        {
             match err {
                 SqliteError::SqliteFailure(
                     rusqlite::ffi::Error {

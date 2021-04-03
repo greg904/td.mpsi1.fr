@@ -32,13 +32,13 @@ CREATE TABLE exercise (
 CREATE TABLE exercise_student_state (
     student_id INTEGER NOT NULL,
     unit_id INTEGER NOT NULL,
-    exercise INTEGER NOT NULL,
+    exercise_index INTEGER NOT NULL,
     -- 0: Reserved by the student
     -- 1: Presented by the student
     state INTEGER NOT NULL,
     FOREIGN KEY (student_id) REFERENCES students(id),
     FOREIGN KEY (unit_id) REFERENCES units(id),
-    UNIQUE(student_id, unit_id, exercise)
+    UNIQUE(student_id, unit_id, exercise_index)
 );
 
 CREATE TABLE exercise_corrections (

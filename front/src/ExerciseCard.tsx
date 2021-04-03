@@ -230,7 +230,7 @@ export function ExerciseCard (props: Props): JSX.Element {
             <div class='dropdown ms-1'>
               <button
                 type='button'
-                class={`btn btn-dark dropdown-toggle`}
+                class='btn btn-dark dropdown-toggle'
                 data-bs-toggle='dropdown'
                 aria-expanded='false'
                 disabled={props.actionPending}
