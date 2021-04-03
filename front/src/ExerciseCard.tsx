@@ -94,7 +94,7 @@ export function ExerciseCard (props: Props): JSX.Element {
     status = 'blocked'
   }
 
-  let correctionPictures
+  let correctionPictures = null
   if (props.correctionImages.length !== 0) {
     correctionPictures = (
       <Masonry
@@ -116,12 +116,6 @@ export function ExerciseCard (props: Props): JSX.Element {
           )
         })}
       </Masonry>
-    )
-  } else {
-    correctionPictures = (
-      <p class='card-text text-muted'>
-        (aucune correction)
-      </p>
     )
   }
 
@@ -157,24 +151,23 @@ export function ExerciseCard (props: Props): JSX.Element {
     )
   }
 
-  let mainButton
-  let dropdownButtonColor
+  let mainButton = null
   const additionalDropdownItems = []
   if (props.presentedBy.some(s => s.id === props.studentId)) {
-    mainButton = (
-      <button
-        type='button'
-        class='btn btn-danger'
-        disabled={props.actionPending}
-        onClick={() => {
-          if (props.onReset !== undefined) { props.onReset() }
-        }}
-      >
-        {mainButtonLoader}
-        Réinitialiser
-      </button>
+    additionalDropdownItems.push(
+      <li>
+        <a
+          class='dropdown-item'
+          href='#'
+          onClick={e => {
+            e.preventDefault()
+            if (props.onReset !== undefined) { props.onReset() }
+          }}
+        >
+          Réinitialiser
+        </a>
+      </li>
     )
-    dropdownButtonColor = 'danger'
   } else if (props.reservedBy.some(s => s.id === props.studentId)) {
     mainButton = (
       <button
@@ -186,7 +179,7 @@ export function ExerciseCard (props: Props): JSX.Element {
         }}
       >
         {mainButtonLoader}
-        Je l'ai présenté
+        Valider mon passage
       </button>
     )
     additionalDropdownItems.push(
@@ -203,7 +196,6 @@ export function ExerciseCard (props: Props): JSX.Element {
         </a>
       </li>
     )
-    dropdownButtonColor = 'success'
   } else {
     mainButton = (
       <button
@@ -218,7 +210,6 @@ export function ExerciseCard (props: Props): JSX.Element {
         Réserver
       </button>
     )
-    dropdownButtonColor = 'primary'
   }
 
   const correctedInMyGroup = props.studentInGroupEven
@@ -228,54 +219,58 @@ export function ExerciseCard (props: Props): JSX.Element {
   return (
     <div class={`exercise-card exercise-card--${status} card`}>
       <div class='card-body'>
-        <div class='d-flex justify-content-between align-items-start mb-3'>
-          <h5 class='card-title'>
-            Exercice {props.exerciseIndex + 1}
+        <div class='mb-3'>
+          <h5 class='exercise-card__title card-title float-start me-3'>
+            <span class='d-sm-none'>#</span>
+            <span class='d-none d-sm-inline'>Exercice </span>
+            {props.exerciseIndex + 1}
           </h5>
-          <div class='btn-group'>
+          <div class='btn-toolbar float-end'>
             {mainButton}
-            <button
-              type='button'
-              class={`btn btn-${dropdownButtonColor} dropdown-toggle`}
-              data-bs-toggle='dropdown'
-              aria-expanded='false'
-              disabled={props.actionPending}
-            />
-            <ul class='dropdown-menu'>
-              {additionalDropdownItems}
-              <li>
-                <Link
-                  className='dropdown-item'
-                  to={`/chapitres/${props.unitId}/exercices/${props.exerciseIndex + 1}/corrections/ajouter`}
-                >
-                  Ajouter la correction
-                </Link>
-              </li>
-              <li>
-                <a
-                  class='dropdown-item'
-                  href='#'
-                  onClick={e => {
-                    e.preventDefault()
-                    if (props.onSetBlocked !== undefined) { props.onSetBlocked(!props.blocked) }
-                  }}
-                >
-                  {props.blocked ? 'On peut faire cet exercice' : 'Il ne faut pas faire cet exercice'}
-                </a>
-              </li>
-              <li>
-                <a
-                  class='dropdown-item'
-                  href='#'
-                  onClick={e => {
-                    e.preventDefault()
-                    if (props.onSetCorrectedByTeacher != null) { props.onSetCorrectedByTeacher(!correctedInMyGroup) }
-                  }}
-                >
-                  {correctedInMyGroup ? 'Mr. Pernette n\'a pas corrigé cet exercice' : 'Mr. Pernette a corrigé cet exercice'}
-                </a>
-              </li>
-            </ul>
+            <div class='dropdown ms-1'>
+              <button
+                type='button'
+                class={`btn btn-dark dropdown-toggle`}
+                data-bs-toggle='dropdown'
+                aria-expanded='false'
+                disabled={props.actionPending}
+              />
+              <ul class='dropdown-menu'>
+                {additionalDropdownItems}
+                <li>
+                  <Link
+                    className='dropdown-item'
+                    to={`/chapitres/${props.unitId}/exercices/${props.exerciseIndex + 1}/corrections/ajouter`}
+                  >
+                    Ajouter la correction (jpg, png)
+                  </Link>
+                </li>
+                <li>
+                  <a
+                    class='dropdown-item'
+                    href='#'
+                    onClick={e => {
+                      e.preventDefault()
+                      if (props.onSetBlocked !== undefined) { props.onSetBlocked(!props.blocked) }
+                    }}
+                  >
+                    {props.blocked ? 'On peut faire cet exercice' : 'Il ne faut pas faire cet exercice'}
+                  </a>
+                </li>
+                <li>
+                  <a
+                    class='dropdown-item'
+                    href='#'
+                    onClick={e => {
+                      e.preventDefault()
+                      if (props.onSetCorrectedByTeacher != null) { props.onSetCorrectedByTeacher(!correctedInMyGroup) }
+                    }}
+                  >
+                    {correctedInMyGroup ? 'Mr. Pernette n\'a pas corrigé cet exercice' : 'Mr. Pernette a corrigé cet exercice'}
+                  </a>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
         {correctionPictures}
