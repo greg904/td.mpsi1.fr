@@ -1,55 +1,112 @@
-import { Fragment, JSX, ComponentChildren } from 'preact'
+import { JSX } from 'preact'
+import Masonry from 'react-masonry-css'
 
-import * as config from './config'
 import * as net from './net'
-import { Thumbnail } from './Thumbnail'
+import * as config from './config'
+import { DeletableImage } from './DeletableImage'
+import { Loader } from './Loader'
+import { Link } from 'react-router-dom'
 
 export interface Props {
-  exercise: net.Exercise
+  unitId: number
   exerciseIndex: number
-  children: ComponentChildren
+  correctionImages: string[]
+  reservedBy: net.Student[]
+  presentedBy: net.Student[]
+  correctedInEvenGroup: boolean
+  correctedInOddGroup: boolean
+  blocked: boolean
+  studentId: number
+  studentInEvenGroup: boolean
+  actionPending: boolean
+  onReserve?: () => void
+  onMarkPresented?: () => void
+  onReset?: () => void
+  onSetBlocked?: (blocked: boolean) => void
+  onSetCorrectedByTeacher?: (corrected: boolean) => void
   onClickCorrectionPictureDelete?: (digest: string) => void
 }
 
-function renderStudentInline (s: net.Student): JSX.Element {
+function renderStudent (s: net.Student): string {
   const group = s.groupA ? 'pair' : 'impair'
-  return <li>{s.fullName} (groupe {group})</li>
+  return `${s.fullName} (groupe ${group})`
+}
+
+function renderStudentList (students: net.Student[]): string {
+  const names = students.map(renderStudent)
+  if (names.length === 1) {
+    return names[0]
+  } else if (names.length === 2) {
+    return `${names[0]} et ${names[1]}`
+  }
+  return `${names.slice(0, -1).join(', ')} et ${names[names.length - 1]}`
 }
 
 export function ExerciseCard (props: Props): JSX.Element {
-  let blockedText = null
-  if (props.exercise.blocked) {
-    blockedText = (
-      <Fragment>
-        <h6 class='mb-2 text-muted'>Ne pas faire</h6>
-        <p>Cet exercice à été marqué comme "à ne pas faire" par quelqu'un.</p>
-      </Fragment>
+  const dlEls = []
+  const statusEls = []
+  let status = 'normal'
+
+  if (props.reservedBy.length !== 0) {
+    dlEls.push(
+      <>
+        <dt>Réservé par</dt>
+        <dd>{renderStudentList(props.reservedBy)}</dd>
+      </>
     )
+    status = 'reserved'
   }
 
-  const correctedGroups = []
-  if (props.exercise.correctedA) { correctedGroups.push('pair') }
-  if (props.exercise.correctedB) { correctedGroups.push('impair') }
-
-  let correctedText = null
-  if (correctedGroups.length !== 0) {
-    correctedText = (
-      <Fragment>
-        <h6 class='mb-2 text-muted'>Corrigé par Mr. Pernette</h6>
-        <ul>{correctedGroups.map((g, i) => <li key={i}>Pour le groupe {g}</li>)}</ul>
-      </Fragment>
+  if (props.presentedBy.length !== 0) {
+    dlEls.push(
+      <>
+        <dt>Présenté par</dt>
+        <dd>{renderStudentList(props.presentedBy)}</dd>
+      </>
     )
+    status = 'presented'
   }
 
-  let correctionPictures = null
-  if (props.exercise.correctionDigests.length !== 0) {
+  if (props.correctedInEvenGroup || props.correctedInOddGroup) {
+    let group
+    if (props.correctedInEvenGroup && props.correctedInOddGroup) {
+      group = <><strong>pair</strong> et <strong>impair</strong></>
+    } else if (props.correctedInEvenGroup) {
+      group = <strong>pair</strong>
+    } else {
+      group = <strong>impair</strong>
+    }
+
+    statusEls.push(
+      <li class='list-group-item'>
+        Corrigé par Mr. Pernette pour le groupe {group}
+      </li>
+    )
+    status = 'presented'
+  }
+
+  if (props.blocked) {
+    statusEls.push(
+      <li class='list-group-item'>
+        Il ne faut pas faire cet exercice.
+      </li>
+    )
+    status = 'blocked'
+  }
+
+  let correctionPictures
+  if (props.correctionImages.length !== 0) {
     correctionPictures = (
-      <Fragment>
-        <h6 class='mb-2 text-muted'>Correction</h6>
-        {props.exercise.correctionDigests.map((d, i) => {
+      <Masonry
+        breakpointCols={2}
+        className='exercise-card__correction-grid'
+        columnClassName='exercise-card__correction-column'
+      >
+        {props.correctionImages.map((d, i) => {
           return (
-            <Thumbnail
+            <DeletableImage
               key={i}
+              class='exercise-card__correction-image'
               src={`${config.correctionsEndpoint}${d}.png`}
               alt='Correction exercice'
               onClickDelete={() => {
@@ -58,43 +115,172 @@ export function ExerciseCard (props: Props): JSX.Element {
             />
           )
         })}
-      </Fragment>
+      </Masonry>
+    )
+  } else {
+    correctionPictures = (
+      <p class='card-text text-muted'>
+        (aucune correction)
+      </p>
     )
   }
 
-  let reservedText = null
-  if (props.exercise.reservedBy.length !== 0) {
-    reservedText = (
-      <Fragment>
-        <h6 class='mb-2 text-muted'>Réservé par</h6>
-        <ul>{props.exercise.reservedBy.map(renderStudentInline)}</ul>
-      </Fragment>
+  if (dlEls.length !== 0) {
+    statusEls.push(
+      <li class='list-group-item'>
+        <div class='exercise-card__margin-hack'>
+          {dlEls}
+        </div>
+      </li>
     )
   }
 
-  let presentedText = null
-  if (props.exercise.presentedBy.length !== 0) {
-    presentedText = (
-      <Fragment>
-        <h6 class='mb-2 text-muted'>Déjà présenté par</h6>
-        <ul>{props.exercise.presentedBy.map(renderStudentInline)}</ul>
-      </Fragment>
+  // The most important messages were added last, in order to overwrite
+  // variables like the status.
+  statusEls.reverse()
+
+  let statusEl = null
+  if (statusEls.length !== 0) {
+    statusEl = (
+      <ul class='list-group list-group-flush'>
+        {statusEls}
+      </ul>
     )
   }
+
+  let mainButtonLoader = null
+  if (props.actionPending) {
+    mainButtonLoader = (
+      <span class='me-2'>
+        <Loader small />
+      </span>
+    )
+  }
+
+  let mainButton
+  let dropdownButtonColor
+  const additionalDropdownItems = []
+  if (props.presentedBy.some(s => s.id === props.studentId)) {
+    mainButton = (
+      <button
+        type='button'
+        class='btn btn-danger'
+        disabled={props.actionPending}
+        onClick={() => {
+          if (props.onReset !== undefined) { props.onReset() }
+        }}
+      >
+        {mainButtonLoader}
+        Réinitialiser
+      </button>
+    )
+    dropdownButtonColor = 'danger'
+  } else if (props.reservedBy.some(s => s.id === props.studentId)) {
+    mainButton = (
+      <button
+        type='button'
+        class='btn btn-success'
+        disabled={props.actionPending}
+        onClick={() => {
+          if (props.onMarkPresented !== undefined) { props.onMarkPresented() }
+        }}
+      >
+        {mainButtonLoader}
+        Je l'ai présenté
+      </button>
+    )
+    additionalDropdownItems.push(
+      <li>
+        <a
+          class='dropdown-item'
+          href='#'
+          onClick={e => {
+            e.preventDefault()
+            if (props.onReset !== undefined) { props.onReset() }
+          }}
+        >
+          Annuler ma réservation
+        </a>
+      </li>
+    )
+    dropdownButtonColor = 'success'
+  } else {
+    mainButton = (
+      <button
+        type='button'
+        class='btn btn-primary'
+        disabled={props.actionPending}
+        onClick={() => {
+          if (props.onReserve !== undefined) { props.onReserve() }
+        }}
+      >
+        {mainButtonLoader}
+        Réserver
+      </button>
+    )
+    dropdownButtonColor = 'primary'
+  }
+
+  const correctedInMyGroup = props.studentInEvenGroup
+    ? props.correctedInEvenGroup
+    : props.correctedInOddGroup
 
   return (
-    <div class='card'>
+    <div class={`exercise-card exercise-card--${status} card`}>
       <div class='card-body'>
-        <h5 class='card-title'>Exercice {props.exerciseIndex + 1}</h5>
-        <p class='card-text'>
-          {blockedText}
-          {correctedText}
-          {correctionPictures}
-          {reservedText}
-          {presentedText}
-        </p>
-        {props.children}
+        <div class='d-flex justify-content-between align-items-start mb-3'>
+          <h5 class='card-title'>
+            Exercice {props.exerciseIndex + 1}
+          </h5>
+          <div class='btn-group'>
+            {mainButton}
+            <button
+              type='button'
+              class={`btn btn-${dropdownButtonColor} dropdown-toggle`}
+              data-bs-toggle='dropdown'
+              aria-expanded='false'
+              disabled={props.actionPending}
+            />
+            <ul class='dropdown-menu'>
+              {additionalDropdownItems}
+              <li>
+                <Link
+                  className='dropdown-item'
+                  to={`/chapitres/${props.unitId}/exercices/${props.exerciseIndex + 1}/corrections/ajouter`}
+                >
+                  Ajouter la correction
+                </Link>
+              </li>
+              <li>
+                <a
+                  class='dropdown-item'
+                  href='#'
+                  onClick={e => {
+                    e.preventDefault()
+                    if (props.onSetBlocked !== undefined) { props.onSetBlocked(!props.blocked) }
+                  }}
+                >
+                  {props.blocked ? 'On peut faire cet exercice' : 'Il ne faut pas faire cet exercice'}
+                </a>
+              </li>
+              <li>
+                <a
+                  class='dropdown-item'
+                  href='#'
+                  onClick={e => {
+                    e.preventDefault()
+                    if (props.onSetCorrectedByTeacher != null) { props.onSetCorrectedByTeacher(!correctedInMyGroup) }
+                  }}
+                >
+                  {correctedInMyGroup ? 'Mr. Pernette n\'a pas corrigé cet exercice' : 'Mr. Pernette a corrigé cet exercice'}
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+        {correctionPictures}
       </div>
+      {statusEl}
     </div>
   )
 }

@@ -1,30 +1,41 @@
-import { Fragment, JSX } from 'preact'
+import { JSX } from 'preact'
 import { useEffect, useState } from 'preact/hooks'
-import { Link } from 'react-router-dom'
+import Masonry from 'react-masonry-css'
 
 import { ExerciseCard } from './ExerciseCard'
-import Loader from './Loader'
+import { Loader } from './Loader'
 import * as net from './net'
+import * as config from './config'
 
 export interface UnitDetailsProps {
   unitId: number
   authToken: string
-  groupA: boolean
+  studentId: number
+  studentInEvenGroup: boolean
+  onInvalidAuthToken?: () => void
 }
 
 export function UnitDetails (props: UnitDetailsProps): JSX.Element {
+  const [exercisesWithPendingAction, setExercisesWithPendingAction] = useState<number[]>([])
+
   // This is a hack to force a refresh of the data.
   const [counter, setCounter] = useState(0)
-  const forceUpdate = (): void => setCounter(c => c + 1)
+  const forceUpdate = (): void => {
+    setCounter(c => c + 1)
+  }
 
   const [exercises, setExercises] = useState<net.Exercise[] | null>(null)
   const [error, setError] = useState(false)
 
   useEffect(() => {
     net.fetchExercisesInUnit(props.authToken, props.unitId)
-      .then(setExercises)
+      .then(exercises => {
+        setExercises(exercises)
+        setExercisesWithPendingAction([])
+      })
       .catch(err => {
         console.error('Failed to fetch exercises', err)
+        if (props.onInvalidAuthToken !== undefined) { props.onInvalidAuthToken() }
         setError(true)
       })
   }, [props.authToken, props.unitId, counter])
@@ -42,106 +53,60 @@ export function UnitDetails (props: UnitDetailsProps): JSX.Element {
   }
 
   const exerciseDivs = exercises.map((e, i) => {
-    const first = i === 0
+    const doUpdate = (makePromise: () => Promise<void>): void => {
+      if (exercisesWithPendingAction.length !== 0) { return }
+      setExercisesWithPendingAction(indices => [...indices, i])
+      makePromise()
+        .then(forceUpdate)
+        .catch(err => {
+          console.error('Failed update exercise:', err)
+          setError(true)
+        })
+    }
 
     return (
-      <div key={i} class={first ? undefined : 'pt-3'}>
-        <ExerciseCard
-          exercise={e}
-          exerciseIndex={i}
-          onClickCorrectionPictureDelete={digest => {
-            net.deleteExerciseCorrection(props.authToken, props.unitId, i, digest)
-              .then(forceUpdate)
-              .catch(err => {
-                console.error('Failed to delete exercise correction:', err)
-                setError(true)
-              })
-          }}
-        >
-          <button
-            type='button'
-            class='btn btn-primary mb-1 me-1'
-            onClick={() => {
-              net.modifyExercise(props.authToken, props.unitId, i, 'state', 'reserved')
-                .then(forceUpdate)
-                .catch(err => {
-                  console.error('Failed to reserve exercise:', err)
-                  setError(true)
-                })
-            }}
-          >
-            Réserver
-          </button>
-          <button
-            type='button'
-            class='btn btn-success mb-1 me-1'
-            onClick={() => {
-              net.modifyExercise(props.authToken, props.unitId, i, 'state', 'presented')
-                .then(forceUpdate)
-                .catch(err => {
-                  console.error('Failed to set exercise as presented:', err)
-                  setError(true)
-                })
-            }}
-          >
-            J'ai présenté l'exercice
-          </button>
-          <button
-            type='button'
-            class='btn btn-danger mb-1 me-1'
-            onClick={() => {
-              net.modifyExercise(props.authToken, props.unitId, i, 'state', 'none')
-                .then(forceUpdate)
-                .catch(err => {
-                  console.error('Failed to reset exercise:', err)
-                  setError(true)
-                })
-            }}
-          >
-            Réinitialiser
-          </button>
-          <button
-            type='button'
-            class='btn btn-secondary mb-1 me-1'
-            onClick={() => {
-              net.modifyExercise(props.authToken, props.unitId, i, 'blocked', !e.blocked)
-                .then(forceUpdate)
-                .catch(err => {
-                  console.error('Failed to toggle blocked state for exercise:', err)
-                  setError(true)
-                })
-            }}
-          >
-            Changer état bloqué
-          </button>
-          <button
-            type='button'
-            class='btn btn-secondary mb-1 me-1'
-            onClick={() => {
-              net.modifyExercise(props.authToken, props.unitId, i, 'corrected', props.groupA ? !e.correctedA : !e.correctedB)
-                .then(forceUpdate)
-                .catch(err => {
-                  console.error('Failed to toggle corrected state for exercise:', err)
-                  setError(true)
-                })
-            }}
-          >
-            Marquer comme corrigé
-          </button>
-          <Link
-            className='btn btn-secondary mb-1 me-1'
-            to={`/chapitres/${props.unitId}/exercices/${i + 1}/corrections/ajouter`}
-          >
-            Ajouter une photo de correction
-          </Link>
-        </ExerciseCard>
-      </div>
+      <ExerciseCard
+        key={i}
+        unitId={props.unitId}
+        exerciseIndex={i}
+        correctionImages={e.correctionDigests}
+        presentedBy={e.presentedBy}
+        reservedBy={e.reservedBy}
+        correctedInEvenGroup={e.correctedA}
+        correctedInOddGroup={e.correctedB}
+        blocked={e.blocked}
+        studentId={props.studentId}
+        studentInEvenGroup={props.studentInEvenGroup}
+        actionPending={exercisesWithPendingAction.includes(i)}
+        onReserve={() => {
+          doUpdate(async () => await net.modifyExercise(props.authToken, props.unitId, i, 'state', 'reserved'))
+        }}
+        onMarkPresented={() => {
+          doUpdate(async () => await net.modifyExercise(props.authToken, props.unitId, i, 'state', 'presented'))
+        }}
+        onReset={() => {
+          doUpdate(async () => await net.modifyExercise(props.authToken, props.unitId, i, 'state', 'none'))
+        }}
+        onSetBlocked={blocked => {
+          doUpdate(async () => await net.modifyExercise(props.authToken, props.unitId, i, 'blocked', blocked))
+        }}
+        onSetCorrectedByTeacher={corrected => {
+          doUpdate(async () => await net.modifyExercise(props.authToken, props.unitId, i, 'corrected', corrected))
+        }}
+        onClickCorrectionPictureDelete={digest => {
+          doUpdate(async () => await net.deleteExerciseCorrection(props.authToken, props.unitId, i, digest))
+        }}
+      />
     )
   })
 
   return (
-    <Fragment>
+    <Masonry
+      breakpointCols={config.pageGridColumns}
+      className='exercise-grid'
+      columnClassName='exercise-grid__column'
+    >
       {exerciseDivs}
-    </Fragment>
+    </Masonry>
   )
 }

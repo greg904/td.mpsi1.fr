@@ -3,6 +3,71 @@ body {
     padding-bottom: 2rem;
 }
 
+.unit-grid, .exercise-grid {
+    display: flex;
+    margin-left: -1rem;
+    margin-bottom: -1rem;
+    width: auto;
+}
+
+.unit-grid__column, .exercise-grid__column {
+    padding-left: 1rem;
+}
+
+.unit-card, .exercise-card {
+    margin-bottom: 1rem;
+}
+
+.deletable-image__actions-btn {
+    opacity: 0.7;
+}
+
+.deletable-image__actions-btn:hover, .deletable-image__actions-btn:focus {
+    opacity: 1;
+}
+
+.exercise-card .list-group-item {
+    background: transparent;
+}
+
+.exercise-card--normal {
+    background-color: #f8f9fa !important;
+}
+
+.exercise-card--blocked {
+    background-color: #f8d7da !important;
+    border-color: #f5c2c7 !important
+}
+
+.exercise-card--presented {
+    background-color: #d1e7dd !important;
+    border-color: #badbcc !important;
+}
+
+.exercise-card--reserved {
+    background-color: #fff3cd !important;
+    border-color: #ffecb5 !important;
+}
+
+.exercise-card__correction-grid {
+    display: flex;
+    margin-left: -0.5rem;
+    margin-bottom: -0.5rem;
+    width: auto
+}
+
+.exercise-card__correction-column {
+    padding-left: 0.5em;
+}
+
+.exercise-card__correction-image {
+    margin-bottom: 0.5rem;
+}
+
+.exercise-card__margin-hack {
+    margin-bottom: -0.5rem;
+}
+
 @media (min-height: 900px) {
     body {
         padding-top: 3rem;

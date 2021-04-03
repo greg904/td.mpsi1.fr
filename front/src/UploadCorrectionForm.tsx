@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks'
 import { useHistory } from 'react-router'
 import { Link } from 'react-router-dom'
-import Loader from './Loader'
+import { Loader } from './Loader'
 
 import * as net from './net'
 

@@ -1,18 +1,20 @@
 import { JSX } from 'preact'
+import Masonry from 'react-masonry-css'
 
 import { UnitCard } from './UnitCard'
 import * as net from './net'
+import * as config from './config'
 
 export interface Props {
   units: net.Unit[]
 
   // Whether or not we are in group A.
-  groupA: boolean
+  studentInEvenGroup: boolean
 }
 
 export function UnitListing (props: Props): JSX.Element {
   const deadlines = props.units.map(u => {
-    const deadline = props.groupA ? u.deadlineA : u.deadlineB
+    const deadline = props.studentInEvenGroup ? u.deadlineA : u.deadlineB
     return deadline
   })
 
@@ -25,21 +27,24 @@ export function UnitListing (props: Props): JSX.Element {
 
   const units = props.units.map((u, i) => {
     return (
-      <div key={i} class='col'>
-        <UnitCard
-          id={u.id}
-          name={u.name}
-          deadline={deadlines[i]}
-          exerciseCount={u.exerciseCount}
-          nextBadge={deadlines[i].valueOf() === nextDeadline}
-        />
-      </div>
+      <UnitCard
+        key={i}
+        id={u.id}
+        name={u.name}
+        deadline={deadlines[i]}
+        exerciseCount={u.exerciseCount}
+        nextBadge={deadlines[i].valueOf() === nextDeadline}
+      />
     )
   })
 
   return (
-    <div class='row row-cols-1 row-cols-lg-2 row-cols-xxl-3 g-3'>
+    <Masonry
+      breakpointCols={config.pageGridColumns}
+      className='unit-grid'
+      columnClassName='unit-grid__column'
+    >
       {units}
-    </div>
+    </Masonry>
   )
 }

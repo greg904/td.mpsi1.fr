@@ -4,7 +4,7 @@ export interface LoaderProps {
   small?: boolean
 }
 
-export default function Loader (props: LoaderProps): JSX.Element {
+export function Loader (props: LoaderProps): JSX.Element {
   let className = 'spinner-border'
   if (props.small !== undefined && props.small) { className += ' spinner-border-sm' }
 

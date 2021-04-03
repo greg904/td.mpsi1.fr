@@ -14,23 +14,23 @@ export function UnitCard (props: Props): JSX.Element {
   if (props.nextBadge) {
     badge = (
       <>
-      &nbsp;
-        <span class='badge bg-success'>Prochain</span>
+        &nbsp;
+        <span class='badge bg-success'>Prochain TD</span>
       </>
     )
   }
 
   return (
-    <div class='card bg-light'>
+    <div class='unit-card card bg-light'>
       <div class='card-body'>
         <h5 class='card-title'>{props.name}{badge}</h5>
         <dl class='mb-2'>
-          <dt>Date de passage</dt>
+          <dt>Date du TD</dt>
           <dd>{props.deadline.toLocaleDateString()}</dd>
           <dt>Nombre d'exercices</dt>
           <dd>{props.exerciseCount}</dd>
         </dl>
-        <Link className='stretched-link' to={`/chapitres/${props.id}`}>Réserver ou modifier</Link>
+        <Link className='stretched-link' to={`/chapitres/${props.id}`}>Réserver un exercice</Link>
       </div>
     </div>
   )

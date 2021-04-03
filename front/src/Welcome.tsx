@@ -2,12 +2,12 @@ import { JSX } from 'preact'
 
 export interface WelcomeProps {
   studentFullName: string
-  studentIsEvenGroup: boolean
+  studentInEvenGroup: boolean
   onClickDisconnect?: () => void
 }
 
 export function Welcome (props: WelcomeProps): JSX.Element {
-  const groupName = props.studentIsEvenGroup ? 'pair' : 'impair'
+  const groupName = props.studentInEvenGroup ? 'pair' : 'impair'
 
   return (
     <>

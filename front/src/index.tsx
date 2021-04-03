@@ -1,5 +1,6 @@
 import 'bootstrap'
-import 'bootstrap/dist/css/bootstrap.css' // Import precompiled Bootstrap css
+import 'bootstrap/dist/css/bootstrap.css'
+import 'bootstrap-icons/font/bootstrap-icons.css'
 
 import { render, JSX } from 'preact'
 import { useState, useEffect } from 'preact/hooks'
@@ -8,7 +9,7 @@ import { BrowserRouter, Link, Route, Switch, useParams } from 'react-router-dom'
 import { LogInForm } from './LogInForm'
 import useStickyState from './use-sticky-state'
 import * as net from './net'
-import Loader from './Loader'
+import { Loader } from './Loader'
 import { UnitDetails } from './UnitDetails'
 import { Welcome } from './Welcome'
 import { UnitListing } from './UnitListing'
@@ -17,7 +18,9 @@ import { UploadCorrectionForm } from './UploadCorrectionForm'
 interface UnitDetailsRouteProps {
   authToken: string
   units: net.Unit[]
-  studentIsEvenGroup: boolean
+  studentId: number
+  studentInEvenGroup: boolean
+  onInvalidAuthToken?: () => void
 }
 
 function UnitDetailsRoute (props: UnitDetailsRouteProps): JSX.Element {
@@ -36,8 +39,10 @@ function UnitDetailsRoute (props: UnitDetailsRouteProps): JSX.Element {
       </nav>
       <UnitDetails
         unitId={unitId}
-        groupA={props.studentIsEvenGroup}
+        studentId={props.studentId}
+        studentInEvenGroup={props.studentInEvenGroup}
         authToken={props.authToken}
+        onInvalidAuthToken={props.onInvalidAuthToken}
       />
     </>
   )
@@ -46,6 +51,7 @@ function UnitDetailsRoute (props: UnitDetailsRouteProps): JSX.Element {
 interface UploadCorrectionFormRouteProps {
   authToken: string
   units: net.Unit[]
+  onInvalidAuthToken?: () => void
 }
 
 function UploadCorrectionFormRoute (props: UploadCorrectionFormRouteProps): JSX.Element {
@@ -68,6 +74,7 @@ function UploadCorrectionFormRoute (props: UploadCorrectionFormRouteProps): JSX.
         authToken={props.authToken}
         unitId={unitId}
         exerciseIndex={exerciseIndex}
+        onInvalidAuthToken={props.onInvalidAuthToken}
       />
     </>
   )
@@ -133,14 +140,23 @@ function App (): JSX.Element {
         <Route path='/chapitres/:unitId(\d+)' exact>
           <UnitDetailsRoute
             units={units}
-            studentIsEvenGroup={student.groupA}
+            studentId={student.id}
+            studentInEvenGroup={student.groupA}
             authToken={authToken}
+            onInvalidAuthToken={() => {
+              // User has to log in again.
+              setAuthToken(null)
+            }}
           />
         </Route>
         <Route path='/chapitres/:unitId(\d+)/exercices/:exerciseIndex(\d+)/corrections/ajouter' exact>
           <UploadCorrectionFormRoute
             authToken={authToken}
             units={units}
+            onInvalidAuthToken={() => {
+              // User has to log in again.
+              setAuthToken(null)
+            }}
           />
         </Route>
         <Route path='/' exact>
@@ -151,12 +167,12 @@ function App (): JSX.Element {
           </nav>
           <Welcome
             studentFullName={student.fullName}
-            studentIsEvenGroup={student.groupA}
+            studentInEvenGroup={student.groupA}
             onClickDisconnect={() => setAuthToken(null)}
           />
           <UnitListing
             units={relevantUnits}
-            groupA={student.groupA}
+            studentInEvenGroup={student.groupA}
           />
         </Route>
       </Switch>
