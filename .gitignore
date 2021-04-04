@@ -1,6 +1,6 @@
 /api/target
 /api/corrections
-/api/test.sqlite3
+/api/db.sqlite3
 
 /front/.parcel-cache
 /front/dist

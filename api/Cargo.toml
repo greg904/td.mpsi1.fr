@@ -18,3 +18,8 @@ sha2 = "0.9.3"
 rusqlite = { version = "0.24.2", features = ["bundled"] }
 subtle = "2.4"
 futures = "0.3.13" 
+
+[profile.release]
+overflow-checks = true
+lto = true
+codegen-units = 1

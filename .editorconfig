@@ -4,10 +4,11 @@ root = true
 charset = "utf-8"
 insert_final_newline = true
 indent_style = space
+indent_size = 2
+
+[*.{rs}]
 indent_size = 4
 
-[*.{svg,js,json,ts,tsx}]
-indent_size = 2
-
-[.babelrc]
-indent_size = 2
+[*.sh]
+indent_style = tab
+indent_size = 8
