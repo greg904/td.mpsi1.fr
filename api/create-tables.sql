@@ -59,7 +59,7 @@ INSERT INTO students (username, full_name, in_group_even) VALUES ("yadrin", "Ale
 INSERT INTO students (username, full_name, in_group_even) VALUES ("baril", "Eloïse Baril", true);
 INSERT INTO students (username, full_name, in_group_even) VALUES ("barrier", "Robin Barrier", true);
 INSERT INTO students (username, full_name, in_group_even) VALUES ("baulard", "Nathan Baulard", true);
-INSERT INTO students (username, full_name, in_group_even) VALUES ("beer-boussoukaia", "Matteo Beer Boussoukaia", false);
+INSERT INTO students (username, full_name, in_group_even) VALUES ("beer-boussoukaya", "Matteo Beer Boussoukaya", false);
 INSERT INTO students (username, full_name, in_group_even) VALUES ("berger", "Timothé Berger", false);
 INSERT INTO students (username, full_name, in_group_even) VALUES ("cartaux", "Eve Cartaux", false);
 INSERT INTO students (username, full_name, in_group_even) VALUES ("clinard", "Rémi Clinard", true);
